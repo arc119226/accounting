@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import { QrCode } from './QrCode';
 import { SYNC } from '../strings/ui';
+import { show } from '../notice';
 import type { SyncTotals } from '../sync/protocol';
 
 function relativeTime(ms: number): string {
@@ -191,7 +192,18 @@ export function SyncScreen() {
           }}
         />
         <div className="modal-actions">
-          <button className="primary-btn" onClick={exportLedger}>{SYNC.exportBtn}</button>
+          {/* 不 await 再呼叫：navigator.share() 必須留在這個 click 的手勢任務內 */}
+          <button
+            className="primary-btn"
+            onClick={() => {
+              void exportLedger().then((outcome) => {
+                if (outcome === 'cancelled') return; // 使用者自己取消的，不必回報
+                show('saved', outcome === 'failed' ? SYNC.exportFailed : SYNC.exported);
+              });
+            }}
+          >
+            {SYNC.exportBtn}
+          </button>
           <button className="ghost-btn" onClick={() => fileRef.current?.click()}>{SYNC.importBtn}</button>
         </div>
         {importFailed && <p className="sync-err over-red">{SYNC.importFailed}</p>}

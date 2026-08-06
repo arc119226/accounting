@@ -3,9 +3,9 @@
  * 毒列擋在 parseImport；發票去重與 unique index 的落盤安全。
  */
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mergeAll, seedCategories, type ExpenseRecord } from '@zhangben/core';
-import { buildExport, parseImport } from '../src/sync/exportFile';
+import { buildExport, parseImport, shareOrDownloadExport } from '../src/sync/exportFile';
 import { decideIncoming } from '../src/sync/applyCore';
 import * as repo from '../src/db/repo';
 import { closeDbForTests } from '../src/db/db';
@@ -155,5 +155,108 @@ describe('exportFile', () => {
     // 水位已低於 minTaken 的 peer 不動
     const again = await repo.lowerPeerCheckpoints('000000000000009-0000-x');
     expect(again[0]!.lastSyncedAt).toBe(peers[0]!.lastSyncedAt);
+  });
+});
+
+/**
+ * 匯出去向——這是**備份能不能真的存下來**的分歧點，不是體驗細節。
+ * iOS standalone 的 a[download] blob 常靜默失敗，所以分享面板優先；
+ * 而「使用者按了取消」絕不能被當成備份完成（會靜默解除 BackupNag）。
+ */
+describe('shareOrDownloadExport（分享優先、下載保底）', () => {
+  const env = buildExport({
+    deviceId: 'aaa',
+    records: [rec('r1', '000000000000005-0000-aaa', 100)],
+    categories: seedCategories().values(),
+    rules: [],
+    persons: [{ id: 'p-me', updatedAt: '000000000000005-0000-aaa', deviceId: 'aaa', deleted: false, name: '我' }],
+    budget: null,
+  });
+
+  /**
+   * 這支測試跑在 node（無 DOM），所以下載路徑要連 document/URL 一起 stub。
+   * 回傳的 clicks 就是「有沒有走下載」的判準。
+   */
+  function stubDom(nav: Record<string, unknown>): { clicks: number; name: string } {
+    const state = { clicks: 0, name: '' };
+    const anchor = {
+      href: '',
+      set download(v: string) { state.name = v; },
+      get download() { return state.name; },
+      click() { state.clicks += 1; },
+    };
+    vi.stubGlobal('navigator', nav);
+    vi.stubGlobal('document', { createElement: () => anchor });
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:test', revokeObjectURL: () => {} });
+    return state;
+  }
+
+  beforeEach(() => {
+    // downloadBlob 會排一個 10 秒後 revoke 的計時器（Safari 立刻 revoke 會取消下載）
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers(); // 趁 URL 還是 stub 的時候把 revoke 跑掉
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('canShare 為真：把 .json File 交給 share，且完全不走下載（不可雙重投遞）', async () => {
+    const shared: ShareData[] = [];
+    const dom = stubDom({
+      canShare: () => true,
+      share: (d: ShareData) => { shared.push(d); return Promise.resolve(); },
+    });
+    await expect(shareOrDownloadExport(env)).resolves.toBe('shared');
+    expect(dom.clicks).toBe(0);
+    const files = shared[0]!.files!;
+    expect(files).toHaveLength(1);
+    expect(files[0]!.name).toBe(`zhangben-backup-${env.exportedAt.slice(0, 10)}.json`);
+    expect(files[0]!.type).toBe('application/json');
+    // payload 只放 files——多帶 title/text 是 iOS 經典破法
+    expect(Object.keys(shared[0]!)).toEqual(['files']);
+  });
+
+  it('使用者取消分享（AbortError）：回 cancelled 且**不**退回下載', async () => {
+    const dom = stubDom({
+      canShare: () => true,
+      share: () => Promise.reject(Object.assign(new Error('cancel'), { name: 'AbortError' })),
+    });
+    await expect(shareOrDownloadExport(env)).resolves.toBe('cancelled');
+    expect(dom.clicks, '取消後又彈一次下載會嚇到人').toBe(0);
+  });
+
+  it('share 被拒（NotAllowedError 等非取消錯誤）：退回下載', async () => {
+    const dom = stubDom({
+      canShare: () => true,
+      share: () => Promise.reject(Object.assign(new Error('gesture'), { name: 'NotAllowedError' })),
+    });
+    await expect(shareOrDownloadExport(env)).resolves.toBe('downloaded');
+    expect(dom.clicks).toBe(1);
+    expect(dom.name).toBe(`zhangben-backup-${env.exportedAt.slice(0, 10)}.json`);
+  });
+
+  it('沒有 canShare（桌面 Firefox 等）：直接走下載', async () => {
+    const dom = stubDom({});
+    await expect(shareOrDownloadExport(env)).resolves.toBe('downloaded');
+    expect(dom.clicks).toBe(1);
+  });
+
+  it('canShare 回 false（有 API 但不收檔案）：走下載', async () => {
+    const dom = stubDom({ canShare: () => false, share: () => Promise.resolve() });
+    await expect(shareOrDownloadExport(env)).resolves.toBe('downloaded');
+    expect(dom.clicks).toBe(1);
+  });
+
+  it('分享出去的檔案內容仍過得了 parseImport（防 stringify 迴歸把備份寫壞）', async () => {
+    let captured: File | null = null;
+    stubDom({
+      canShare: () => true,
+      share: (d: ShareData) => { captured = d.files![0]!; return Promise.resolve(); },
+    });
+    await shareOrDownloadExport(env);
+    const parsed = parseImport(await (captured as unknown as File).text());
+    expect(parsed.ok).toBe(true);
   });
 });

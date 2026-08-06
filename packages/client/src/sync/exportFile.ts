@@ -38,16 +38,65 @@ export function buildExport(input: {
   };
 }
 
+/** 匯出的去向。cancelled 與 failed **都不算完成備份**（呼叫端不可推進 lastExportMs）。 */
+export type ExportOutcome = 'shared' | 'downloaded' | 'cancelled' | 'failed';
+
 /** 觸發下載（檔名帶日期，好找） */
-export function downloadExport(env: ExportEnvelope): void {
-  const blob = new Blob([JSON.stringify(env)], { type: 'application/json' });
+function downloadBlob(blob: Blob, name: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `zhangben-backup-${env.exportedAt.slice(0, 10)}.json`;
+  a.download = name;
   a.click();
   // revoke 延後：Safari 立刻 revoke 會取消下載
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/**
+ * 匯出：**分享面板優先、下載保底**。
+ *
+ * 為什麼不能只留 a[download]：iOS 加到主畫面後（standalone）的 blob 下載時常靜默失敗——
+ * 使用者以為備份好了，其實什麼都沒存下來。備份是這個 app 對抗「手機掉了」的唯一手段，
+ * 靜默失敗是不能接受的失敗模式；分享面板則能直接存進「檔案」或傳給自己。
+ *
+ * **share() 必須留在 click 的手勢任務內**：async 函式在第一個 await 前是同步跑的，
+ * 所以順序必須是 建 JSON → Blob → File → canShare → **呼叫 share()** → 才 await。
+ * 這之前只要有任何 await（含呼叫端），Safari 就丟 NotAllowedError，於是悄悄退回
+ * 我們正要修掉的那條壞下載路徑。payload 也只放 files——多帶 title/text 是 iOS 經典破法。
+ */
+export async function shareOrDownloadExport(env: ExportEnvelope): Promise<ExportOutcome> {
+  const name = `zhangben-backup-${env.exportedAt.slice(0, 10)}.json`;
+  let blob: Blob;
+  try {
+    blob = new Blob([JSON.stringify(env)], { type: 'application/json' });
+  } catch {
+    return 'failed';
+  }
+  let sharing: Promise<void> | null = null;
+  try {
+    const file = new File([blob], name, { type: 'application/json' });
+    if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+      sharing = navigator.share({ files: [file] });
+    }
+  } catch {
+    // File 建構或 canShare 拋錯（舊瀏覽器/受限環境）：往下走下載
+  }
+  if (sharing) {
+    try {
+      await sharing;
+      return 'shared';
+    } catch (err) {
+      // 使用者按取消：**不是**完成備份，也不要再彈一次下載嚇他
+      if (err instanceof Error && err.name === 'AbortError') return 'cancelled';
+      // 其他錯（NotAllowedError 等）：退回下載
+    }
+  }
+  try {
+    downloadBlob(blob, name);
+    return 'downloaded';
+  } catch {
+    return 'failed';
+  }
 }
 
 /**

@@ -15,7 +15,7 @@ import { getDeviceId, getPersonId } from '../ids';
 import { decideIncoming, type ApplyDecision } from '../sync/applyCore';
 import type { SyncHandle } from '../sync/trystero';
 import type { PeerHello, SyncKind, SyncSession, SyncTotals } from '../sync/protocol';
-import { buildExport, downloadExport, parseImport } from '../sync/exportFile';
+import { buildExport, parseImport, shareOrDownloadExport, type ExportOutcome } from '../sync/exportFile';
 import { logError } from '../errlog';
 import { show } from '../notice';
 
@@ -43,7 +43,8 @@ export interface SyncSlice {
   setPendingJoin(code: string): void;
   clearPendingJoin(): void;
   cancelSync(): void;
-  exportLedger(): void;
+  /** 回傳去向讓畫面決定文案——store 不組顯示文字 */
+  exportLedger(): Promise<ExportOutcome>;
   importLedger(file: File): Promise<void>;
 }
 
@@ -229,9 +230,11 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
       set({ syncSession: null, syncRole: null, roomCode: null });
     },
 
+    // 不加 async：async 會讓整個函式體排進 microtask，而 shareOrDownloadExport 內的
+    // navigator.share() 必須留在 click 的手勢任務內，否則 Safari 丟 NotAllowedError
     exportLedger() {
       const s = get();
-      downloadExport(
+      return shareOrDownloadExport(
         buildExport({
           deviceId: getDeviceId(),
           records: s.records.values(),
@@ -240,8 +243,14 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
           persons: s.persons.values(),
           budget: s.budget,
         }),
-      );
-      s.updateSettings({ lastExportMs: Date.now() });
+      ).then((outcome) => {
+        // 取消/失敗都不推進備份時鐘——推了的話 BackupNag 會被靜默解除，
+        // 使用者從此以為自己備份過了
+        if (outcome === 'shared' || outcome === 'downloaded') {
+          get().updateSettings({ lastExportMs: Date.now() });
+        }
+        return outcome;
+      });
     },
 
     async importLedger(file) {

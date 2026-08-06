@@ -145,6 +145,8 @@ export const SYNC = {
   fileDesc: '匯出完整帳本 JSON 檔；匯入時走同一套合併，不會蓋掉較新的記錄。',
   exportBtn: '匯出帳本',
   importBtn: '匯入帳本',
+  exported: '帳本已匯出',
+  exportFailed: '匯出失敗——請再試一次',
   importFailed: '這不是柴米帳的備份檔，或檔案已損毀。',
   backupNag: '已超過 30 天沒有同步或備份——花一分鐘匯出一份吧。',
 } as const;
