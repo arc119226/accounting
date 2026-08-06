@@ -140,6 +140,8 @@
 .cat-add-row .text-input { flex: 1; min-width: 90px; width: auto; }
 .cat-glyph-input { max-width: 58px; text-align: center; flex: 0 0 auto; }
 
+.rule-select { max-width: 140px; flex: 0 0 auto; }
+
 /* 設定頁零碎 */
 .storage-line { line-height: 1.7; }
 .version-line { font-size: 12px; }

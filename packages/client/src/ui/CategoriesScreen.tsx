@@ -1,13 +1,52 @@
 /**
- * 分類管理：排序（▲▼ 交換——比拖曳簡單且鍵盤可達）、自訂分類增/改/刪、內建鎖刪除。
- * M3 後追加：已學習的商家規則清單（改派/刪除）。
+ * 分類管理：排序（▲▼ 交換——比拖曳簡單且鍵盤可達）、自訂分類增/改/刪、內建鎖刪除、
+ * 已學習的商家規則清單（改派分類/刪除）。
  */
 import { useState } from 'react';
 import { sortCategories } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CategorySeal } from './LedgerScreen';
-import { CATEGORIES } from '../strings/ui';
+import { CATEGORIES, RULES } from '../strings/ui';
+
+function RulesCard() {
+  const rules = useAppStore((s) => s.rules);
+  const categories = useAppStore((s) => s.categories);
+  const upsertRule = useAppStore((s) => s.upsertRule);
+  const deleteRule = useAppStore((s) => s.deleteRule);
+  const alive = [...rules.values()].filter((r) => !r.deleted);
+  const cats = sortCategories(categories.values());
+  return (
+    <div className="paper-card">
+      <div className="field-label">{RULES.title}</div>
+      {alive.length === 0 ? (
+        <p className="dim-text">{RULES.empty}</p>
+      ) : (
+        alive.map((r) => (
+          <div key={r.id} className="cat-row">
+            <span className="cat-name">
+              {r.displayName || <span className="tnum">統編 {r.id}</span>}
+            </span>
+            <select
+              className="text-input rule-select"
+              value={r.categoryId}
+              onChange={(e) => upsertRule(r.id, e.target.value, r.displayName)}
+            >
+              {cats.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.glyph} {c.name}
+                </option>
+              ))}
+            </select>
+            <button className="ghost-btn cat-tool danger-ghost" onClick={() => deleteRule(r.id)}>
+              ✕
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
 
 export function CategoriesScreen() {
   const categories = useAppStore((s) => s.categories);
@@ -104,6 +143,8 @@ export function CategoriesScreen() {
           </button>
         </div>
       </div>
+
+      <RulesCard />
 
       {deleting && (
         <ConfirmDialog

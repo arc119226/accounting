@@ -3,8 +3,9 @@
  * 讓 `.screen` 的進場動畫（styles/base.css screenIn）每次換頁重播。
  * 底部四鈕（帳本/掃發票/統計/同步）+ 右上角設定；EntrySheet 是 overlay 不佔屏。
  */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useAppStore, type Screen } from './store/appStore';
+import { noteChunkLoadFailure } from './version';
 import { AppToast } from './ui/AppToast';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { LedgerScreen } from './ui/LedgerScreen';
@@ -13,6 +14,17 @@ import { CategoriesScreen } from './ui/CategoriesScreen';
 import { SettingsScreen } from './ui/SettingsScreen';
 import { StatsScreen } from './ui/StatsScreen';
 import { InkDefs } from './ui/charts/InkDefs';
+
+// 掃描頁 lazy chunk：偵測引擎（含 1MB wasm 載點）只在首掃進入；
+// 部署後舊分頁的 chunk 失蹤 → noteChunkLoadFailure 觸發更新 toast
+const ScanScreen = lazy(() =>
+  import('./ui/ScanScreen')
+    .then((m) => ({ default: m.ScanScreen }))
+    .catch((err: unknown) => {
+      noteChunkLoadFailure();
+      throw err;
+    }),
+);
 import { APP, NAV, PLACEHOLDER } from './strings/ui';
 
 function PlaceholderScreen() {
@@ -81,6 +93,11 @@ export function App() {
         </header>
         {screen === 'ledger' ? <LedgerScreen />
           : screen === 'stats' ? <StatsScreen />
+          : screen === 'scan' ? (
+            <Suspense fallback={<div className="screen-body"><span className="spinner" /></div>}>
+              <ScanScreen />
+            </Suspense>
+          )
           : screen === 'categories' ? <CategoriesScreen />
           : screen === 'settings' ? <SettingsScreen />
           : <PlaceholderScreen />}

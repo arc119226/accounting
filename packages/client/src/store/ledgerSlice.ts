@@ -6,7 +6,7 @@
  * 墓碑（deleted:true）**留在 Map 裡**（merge/同步需要），UI 一律自行過濾。
  */
 import type { StateCreator } from 'zustand';
-import type { Budget, Category, ExpenseRecord, MerchantRule, PersonId } from '@zhangben/core';
+import type { Budget, Category, ExpenseRecord, MerchantRule, ParsedInvoice, PersonId } from '@zhangben/core';
 import { monthOf } from '@zhangben/core';
 import type { AppStore } from './appStore';
 import * as repo from '../db/repo';
@@ -56,6 +56,18 @@ export interface LedgerSlice {
   /** 與相鄰分類交換 order（-1=往前、+1=往後） */
   moveCategory(id: string, dir: -1 | 1): void;
   setBudget(monthlyTotal: number, perCategory: Readonly<Record<string, number>>): void;
+  /** 掃描入帳：寫記錄 + 商家規則學習（一人歸類、兩機受益——規則會同步） */
+  saveScanned(input: {
+    readonly inv: ParsedInvoice;
+    readonly amount: number;
+    readonly date: string;
+    readonly categoryId: string;
+    readonly note: string;
+    readonly merchantName: string;
+    readonly paidBy: PersonId;
+  }): void;
+  upsertRule(sellerTaxId: string, categoryId: string, displayName: string): void;
+  deleteRule(id: string): void;
 }
 
 /** 今天（裝置當地）的 'YYYY-MM-DD'——UI 層唯一的「現在」來源，core 不取時間 */
@@ -236,6 +248,73 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
     categories.set(id, row);
     set({ categories });
     persist(repo.putCategory(row), 'putCategory(tombstone)');
+  },
+
+  saveScanned(input) {
+    const s = get();
+    // 最後一道去重閘（UI 已擋；並發掃同一張的窗口期防線）
+    for (const r of s.records.values()) {
+      if (r.invoice?.number === input.inv.number && !r.deleted) return;
+    }
+    const row: ExpenseRecord = {
+      id: uuidv7(),
+      updatedAt: tickClock(),
+      deviceId: getDeviceId(),
+      deleted: false,
+      source: 'einvoice',
+      amount: input.amount,
+      date: input.date,
+      categoryId: input.categoryId,
+      note: input.note,
+      paidBy: input.paidBy,
+      invoice: { number: input.inv.number, randomCode: input.inv.randomCode },
+      merchant: {
+        sellerTaxId: input.inv.sellerTaxId,
+        ...(input.merchantName ? { name: input.merchantName } : {}),
+      },
+      ...(input.inv.items.length > 0 ? { items: input.inv.items } : {}),
+    };
+    const records = new Map(s.records);
+    records.set(row.id, row);
+    set({ records });
+    persist(repo.putRecord(row), 'putRecord(scan)');
+    // 學習迴圈：分類異動∨規則缺∨新命名 才寫（避免無意義的信封 bump 造成同步噪音）
+    const rule = s.rules.get(input.inv.sellerTaxId);
+    const nameChanged = input.merchantName !== '' && rule?.displayName !== input.merchantName;
+    if (!rule || rule.deleted || rule.categoryId !== input.categoryId || nameChanged) {
+      get().upsertRule(
+        input.inv.sellerTaxId,
+        input.categoryId,
+        input.merchantName || rule?.displayName || '',
+      );
+    }
+  },
+
+  upsertRule(sellerTaxId, categoryId, displayName) {
+    const s = get();
+    const row: MerchantRule = {
+      id: sellerTaxId,
+      updatedAt: tickClock(),
+      deviceId: getDeviceId(),
+      deleted: false,
+      categoryId,
+      displayName: displayName.trim().slice(0, 20),
+    };
+    const rules = new Map(s.rules);
+    rules.set(row.id, row);
+    set({ rules });
+    persist(repo.putRule(row), 'putRule');
+  },
+
+  deleteRule(id) {
+    const s = get();
+    const existing = s.rules.get(id);
+    if (!existing || existing.deleted) return;
+    const row: MerchantRule = { ...existing, deleted: true, updatedAt: tickClock(), deviceId: getDeviceId() };
+    const rules = new Map(s.rules);
+    rules.set(id, row);
+    set({ rules });
+    persist(repo.putRule(row), 'putRule(tombstone)');
   },
 
   setBudget(monthlyTotal, perCategory) {

@@ -86,6 +86,30 @@ export const CATEGORIES = {
   moveDown: '下移',
 } as const;
 
+export const SCAN = {
+  starting: '喚起鏡頭…',
+  engineLoading: '載入辨識引擎…',
+  denied: '鏡頭無法開啟——請改用拍照辨識',
+  hintCamera: '對準發票下方的兩個方塊碼',
+  leftOnly: '已讀到左碼，正在補讀右碼帶品項…',
+  photoBtn: '拍照辨識',
+  photoNone: '照片裡沒有讀到發票碼',
+  previewTitle: '掃到一張發票',
+  existsTitle: '這張發票已在帳上',
+  viewExisting: '查看該筆',
+  rescan: '重掃',
+  invNoLabel: '發票號碼',
+  amountLabel: '金額',
+  itemsLabel: '品項',
+  itemsPartial: '（發票僅載部分品項）',
+  save: '入帳',
+} as const;
+
+export const RULES = {
+  title: '商家規則（掃描學習）',
+  empty: '掃發票並歸類後，這裡會記住店家。',
+} as const;
+
 export const STATS = {
   thisMonth: '本月',
   lastMonth: '上月',

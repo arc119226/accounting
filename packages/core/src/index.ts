@@ -56,3 +56,11 @@ export {
   type MonthTotal,
 } from './stats';
 export { budgetProgress, type BudgetLine, type BudgetProgress } from './budget';
+export {
+  looksLikeEInvoiceLeft,
+  looksLikeEInvoiceRight,
+  mergeRightQr,
+  parseEInvoiceLeft,
+  type EInvoiceError,
+  type ParsedInvoice,
+} from './einvoice';
