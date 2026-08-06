@@ -1,10 +1,10 @@
 /**
  * categories.ts 測試。
  *
- * sortCategories 用 fast-check property test：排序正確性（升冪、tie-break、
- * 排除墓碑、穩定性）是對「任意輸入」的全稱命題，例題測試只能抽查；
- * 縮小 order/name 的取值域來強迫大量碰撞，才真的踩得到 tie-break 與
- * 穩定性的路徑。seed 與 suggestCategory 是有限狀態，例題測試即可窮盡。
+ * sortCategories 用 fast-check property test：排序正確性（升冪、三層 tie-break、
+ * 排除墓碑、**與輸入順序無關**）是對「任意輸入」的全稱命題，例題測試只能抽查；
+ * 縮小 order/name 的取值域來強迫大量碰撞，才真的踩得到決勝路徑。
+ * seed 與 suggestCategory 是有限狀態，例題測試即可窮盡。
  */
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
@@ -75,7 +75,7 @@ describe('sortCategories', () => {
   }
 
   // 取值域刻意縮小：order 只有 0..3、name 只有四個，才會頻繁撞出
-  // 「同 order 比 name」與「order+name 全同靠穩定性」兩條路徑
+  // 「同 order 比 name」與「order+name 全同、比到 id」兩條路徑
   const arbCat = fc.record({
     name: fc.constantFrom('餐飲', '交通', '其他', '醫療'),
     order: fc.integer({ min: 0, max: 3 }),
@@ -100,36 +100,47 @@ describe('sortCategories', () => {
     );
   });
 
-  it('property：相鄰兩筆必為 order 升冪、同 order 則 name 依 zh-Hant 非降冪', () => {
+  it('property：相鄰兩筆嚴格遞增於 (order, name, id)——三層決勝到底', () => {
     fc.assert(
       fc.property(arbCats, (cats) => {
         const out = sortCategories(cats);
         for (let i = 1; i < out.length; i++) {
           const prev = out[i - 1]!;
           const cur = out[i]!;
-          expect(
-            prev.order < cur.order ||
-              (prev.order === cur.order && prev.name.localeCompare(cur.name, 'zh-Hant') <= 0),
-          ).toBe(true);
+          // 逐碼位而非 localeCompare：實作刻意不依賴 ICU（見 sortCategories 註解），
+          // 用 localeCompare 當 oracle 的話這條測試自己就會隨環境漂移
+          const key = (c: typeof prev): [number, string, string] => [c.order, c.name, c.id];
+          const [po, pn, pi] = key(prev);
+          const [co, cn, ci] = key(cur);
+          expect(po < co || (po === co && (pn < cn || (pn === cn && pi < ci)))).toBe(true);
         }
       }),
     );
   });
 
-  it('property：穩定排序——order 與 name 全同者保持輸入相對順序', () => {
+  /**
+   * 這條取代了原本的「穩定排序：order 與 name 全同者保持輸入相對順序」。
+   * 那條把**錯的東西**釘死了：依賴輸入順序正是 bug——輸入是 store 的 Map.values()，
+   * 插入序由「同步收到的先後」決定，兩台裝置不同 ⇒ 分類頁可以永久不一致。
+   * 真正該成立的不變量是反過來的：**輸入怎麼排都不影響輸出**。
+   */
+  it('property：輸出與輸入順序無關（打亂輸入必得同一結果）', () => {
     fc.assert(
-      fc.property(arbCats, (cats) => {
-        const out = sortCategories(cats);
-        const inputIndex = new Map(cats.map((c, i) => [c.id, i]));
-        for (let i = 1; i < out.length; i++) {
-          const prev = out[i - 1]!;
-          const cur = out[i]!;
-          if (prev.order === cur.order && prev.name === cur.name) {
-            expect(inputIndex.get(prev.id)!).toBeLessThan(inputIndex.get(cur.id)!);
-          }
-        }
+      fc.property(arbCats, fc.integer({ min: 0, max: 1000 }), (cats, rot) => {
+        const shuffled = cats.map((_, i) => cats[(i + rot) % cats.length]!).reverse();
+        expect(sortCategories(shuffled).map((c) => c.id)).toEqual(
+          sortCategories(cats).map((c) => c.id),
+        );
       }),
     );
+  });
+
+  it('撞號（兩台各自新增分類都算出同一個 order）仍收斂到同一順序', () => {
+    // 真實情境：A、B 兩機各建一個分類，addCategory 都取 maxOrder+1 ⇒ order 相同、id 不同
+    const a = cat('cat-aaa', '旅遊', 9);
+    const b = cat('cat-bbb', '旅遊', 9);
+    expect(sortCategories([a, b]).map((c) => c.id)).toEqual(['cat-aaa', 'cat-bbb']);
+    expect(sortCategories([b, a]).map((c) => c.id)).toEqual(['cat-aaa', 'cat-bbb']);
   });
 
   it('property：不變異輸入（純函式）', () => {

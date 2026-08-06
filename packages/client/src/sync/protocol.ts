@@ -43,7 +43,13 @@ export type SyncEvent =
   | { readonly e: 'peer-leave' }
   | { readonly e: 'msg'; readonly msg: SyncMsg }
   | { readonly e: 'sent-all'; readonly totalSent: number }
-  | { readonly e: 'applied'; readonly kind: SyncKind; readonly summary: MergeSummary; readonly deduped: number }
+  | {
+      readonly e: 'applied';
+      readonly kind: SyncKind;
+      readonly summary: MergeSummary;
+      readonly deduped: number;
+      readonly rejected: number;
+    }
   /** 套用落盤失敗：**不可**偽裝成 applied——那會讓協定完成、checkpoint 照存、該批永久遺失 */
   | { readonly e: 'apply-failed' }
   | { readonly e: 'timeout' }
@@ -66,6 +72,11 @@ export interface SyncTotals {
   readonly skipped: number;
   readonly deletes: number;
   readonly deduped: number;
+  /**
+   * 沒通過 rowSchema、被丟掉的列。丟掉是刻意的（整批失敗會讓一列壞資料把每天的
+   * 同步永久卡死），但**必須數出來給人看**——靜默丟資料正是這一輪在修的病。
+   */
+  readonly rejected: number;
 }
 
 export interface SyncSession {
@@ -104,7 +115,7 @@ export function makeSession(my: PeerHello): SyncSession {
     appliedBatches: 0,
     receivedRows: 0,
     expectedRows: null,
-    totals: { added: 0, updated: 0, skipped: 0, deletes: 0, deduped: 0 },
+    totals: { added: 0, updated: 0, skipped: 0, deletes: 0, deduped: 0, rejected: 0 },
     sentDone: false,
     gotDone: false,
     sentAck: false,
@@ -193,6 +204,7 @@ export function syncReduce(s: SyncSession, ev: SyncEvent): [SyncSession, SyncEff
           skipped: t.skipped + ev.summary.skipped,
           deletes: t.deletes + ev.summary.deletes,
           deduped: t.deduped + ev.deduped,
+          rejected: t.rejected + ev.rejected,
         },
       };
       return maybeFinish(next);

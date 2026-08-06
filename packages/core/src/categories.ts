@@ -55,18 +55,29 @@ export function seedCategories(): Map<string, Category> {
 }
 
 /**
- * 顯示排序：order 升冪、同 order 以 name 決勝；排除墓碑。
+ * 顯示排序：order 升冪 → name 逐碼位 → id 決勝；排除墓碑。
  * - 排序是顯示層取分類清單的唯一入口，「已刪不出現」在這裡一次做完，
  *   免得每個畫面各自記得過濾墓碑。
- * - name 明訂 'zh-Hant' locale 而非裝置預設：同一份帳本在兩台手機上
- *   的排序必須位元一致，不能隨系統語言漂移。
- * - Array.prototype.sort 自 ES2019 保證穩定，故 (order, name) 全同時
- *   保持輸入相對順序——這讓排序結果對輸入順序決定論。
+ * - **決勝一路到 id**（審查修正）：撞號是常態而非例外——兩台裝置各自新增分類時
+ *   都算出同一個 maxOrder+1。決勝不到底的話，剩下的順序就落在 Array.sort 的
+ *   穩定性上，也就是**輸入順序**；而輸入是 store 的 Map.values()，插入序由
+ *   「同步收到的先後」決定 ⇒ 兩機的分類頁可以永久不一致。id 是全域唯一的，
+ *   比到它就是全序。（原註解說穩定性讓結果「對輸入順序決定論」，因果講反了：
+ *   穩定性正是讓結果**相依於**輸入順序。）
+ * - **不用 localeCompare**：hlc.ts 的檔頭已經寫死這條 core 鐵律——它隨執行環境
+ *   的 locale 與 ICU/CLDR 資料變化（small-icu 的 Node 會退回 root collation），
+ *   非決定論。逐碼位比較換來的是「同 order 時的中文排序不照筆畫」，
+ *   而 order 本來就是使用者自己排的，這個位置的字典序沒有語意。
  */
 export function sortCategories(cats: Iterable<Category>): Category[] {
   return [...cats]
     .filter((c) => !c.deleted)
-    .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'zh-Hant'));
+    .sort((a, b) => a.order - b.order || cmpStr(a.name, b.name) || cmpStr(a.id, b.id));
+}
+
+/** 逐碼位比較（與 hlcCompare 同源的理由：決定論優先於地區慣例） */
+function cmpStr(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /**

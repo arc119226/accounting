@@ -176,6 +176,18 @@ export interface MonthSummary {
 }
 
 /**
+ * 四捨五入（away from zero）——不是 `Math.round`。
+ *
+ * Math.round 是 round-half-up（往 +∞）：−1.5 進到 −1、+1.5 進到 +2，
+ * 同幅度的增與減顯示出不同的絕對值；而且 Math.round(−0.5) 是 **−0**，
+ * 畫面上會出現「-0%」。中文語境的「四捨五入」是 away from zero，
+ * 這裡對齊使用者的預期。`|| 0` 把 −0 收成 0（Object.is(−0, 0) 為 false）。
+ */
+function roundHalfAway(x: number): number {
+  return (Math.sign(x) * Math.round(Math.abs(x))) || 0;
+}
+
+/**
  * 月結摘要：本月 vs 上月、變動最大的幾個分類、本月最大單筆。
  *
  * 一趟掃完兩個月：月結卡是「回頭看一眼」的東西，不值得為它多掃幾遍全帳。
@@ -222,7 +234,7 @@ export function monthSummary(
     total,
     prevTotal,
     delta: total - prevTotal,
-    deltaPct: prevTotal === 0 ? null : Math.round(((total - prevTotal) / prevTotal) * 100),
+    deltaPct: prevTotal === 0 ? null : roundHalfAway(((total - prevTotal) / prevTotal) * 100),
     movers: movers.slice(0, Math.max(0, Math.trunc(topMovers))),
     largestId,
     largestAmount,

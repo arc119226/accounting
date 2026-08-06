@@ -16,10 +16,11 @@ import { decideIncoming, type ApplyDecision } from '../sync/applyCore';
 import type { SyncHandle } from '../sync/trystero';
 import type { PeerHello, SyncKind, SyncSession, SyncTotals } from '../sync/protocol';
 import { buildExport, parseImport, shareOrDownloadExport, type ExportOutcome } from '../sync/exportFile';
+import { ROW_OK } from '../sync/rowSchema';
 import { logError } from '../errlog';
 import { show } from '../notice';
 
-const EMPTY_TOTALS: SyncTotals = { added: 0, updated: 0, skipped: 0, deletes: 0, deduped: 0 };
+const EMPTY_TOTALS: SyncTotals = { added: 0, updated: 0, skipped: 0, deletes: 0, deduped: 0, rejected: 0 };
 
 export interface SyncSlice {
   peers: readonly repo.PeerInfo[];
@@ -53,8 +54,16 @@ let handle: SyncHandle | null = null;
 let syncGen = 0;
 
 export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, get) => {
-  /** 套用一批：同步裁決 + set，之後落盤（throw 由呼叫端接手）+ 水位回撥 */
-  async function applyBatch(kind: SyncKind, rows: readonly Syncable[]) {
+  /** 套用一批：逐列驗證 → 同步裁決 + set → 落盤（throw 由呼叫端接手）+ 水位回撥 */
+  async function applyBatch(kind: SyncKind, allRows: readonly Syncable[]) {
+    // 逐列驗證（與檔案匯入同一份 rowSchema）。**丟掉壞列而不是整批失敗**：
+    // 整批失敗＝不存 checkpoint＝下次重送同一批，若對方那列是持久性的壞資料
+    // （舊版本、記憶體損壞），每天的同步就永久卡死——那比丟掉那列更糟。
+    // 代價是被丟的列不會再重送，所以 rejected 一路帶到摘要卡上讓人看得見。
+    const ok = ROW_OK[kind];
+    const rows = allRows.filter((r) => ok(r));
+    const rejected = allRows.length - rows.length;
+    if (rejected > 0) logError(`sync rejected ${rejected} bad ${kind} row(s)`);
     let out: ApplyDecision<Syncable>;
     if (kind === 'records') {
       set((cur) => {
@@ -103,7 +112,7 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
         .then((peers) => set({ peers }))
         .catch((err: unknown) => logError(`lowerPeerCheckpoints: ${String(err)}`));
     }
-    return { summary: decision.summary, deduped: decision.deduped };
+    return { summary: decision.summary, deduped: decision.deduped, rejected };
   }
 
   function myHello(): PeerHello {
@@ -129,7 +138,9 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
     // 值已 ≥ 自己每一列的 updatedAt ⇒ 下次對方帶著這個水位過來，changedSince 永遠算出空集合，
     // **這台的整本帳從此不再增量傳給對方**（靜默，且 lowerPeerCheckpoints 只在收進更舊的列時
     // 才回撥，救不到）。閘放在這裡＝涵蓋所有入口，不只 deep link 那一條。
-    if (!get().hydrated) return;
+    // hydrateFailed 一併擋：IDB 開不起來時記憶體同樣是空帳本，但 hydrated 為了讓
+    // UI 渲染得出來仍是 true——只看 hydrated 的話這道閘等於形同虛設。
+    if (!get().hydrated || get().hydrateFailed) return;
     const gen = ++syncGen;
     handle?.cancel();
     handle = null;
@@ -255,7 +266,19 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
 
     async importLedger(file) {
       set({ importSummary: null, importFailed: false });
-      const parsed = parseImport(await file.text());
+      // file.text() **必須在 try 內**：iCloud Drive 上還沒下載完的備份會以
+      // NotReadableError reject，而呼叫端是 void importLedger(f)——漏在外面的話
+      // 是 unhandled rejection，加上第一行剛把兩個回饋旗標都清空，畫面上
+      // 完全沒反應，使用者只會再按一次。
+      let text: string;
+      try {
+        text = await file.text();
+      } catch (err) {
+        logError(`import read: ${String(err)}`);
+        set({ importFailed: true });
+        return;
+      }
+      const parsed = parseImport(text);
       if (!parsed.ok) {
         set({ importFailed: true });
         return;
@@ -285,6 +308,7 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
           totals.skipped += r.summary.skipped;
           totals.deletes += r.summary.deletes;
           totals.deduped += r.deduped;
+          totals.rejected += r.rejected; // parseImport 已整檔把關，這裡恆為 0——留著是為了兩條路共用同一張摘要卡
         }
         set({ importSummary: totals });
       } catch (err) {

@@ -7,10 +7,10 @@
  */
 import type { StateCreator } from 'zustand';
 import type { Budget, Category, ExpenseRecord, MerchantRule, ParsedInvoice, Person } from '@zhangben/core';
-import { monthOf, restoreRecord as coreRestoreRecord } from '@zhangben/core';
+import { monthOf, restoreRecord as coreRestoreRecord, sortCategories } from '@zhangben/core';
 import type { AppStore } from './appStore';
 import * as repo from '../db/repo';
-import { tickClock } from '../clock';
+import { seedClock, tickClock } from '../clock';
 import { getDeviceId, getPersonId, uuidv7 } from '../ids';
 import { logError } from '../errlog';
 import { show } from '../notice';
@@ -54,6 +54,13 @@ export interface EntryValues {
 
 export interface LedgerSlice {
   hydrated: boolean;
+  /**
+   * hydrate 走了 catch（IDB 開不起來）⇒ 記憶體是**空帳本**而不是「真的沒帳」。
+   * 與 hydrated 分開一個旗標的理由：hydrated 同時是 UI 的渲染閘（NameGate/SyncScreen），
+   * 失敗時不能不設；但同步**絕不可以**在這個狀態下入房——空帳本握手會把 checkpoint
+   * 推到頂，這台的整本帳從此不再增量傳給對方（見 syncSlice.begin）。
+   */
+  hydrateFailed: boolean;
   records: Map<string, ExpenseRecord>;
   categories: Map<string, Category>;
   rules: Map<string, MerchantRule>;
@@ -82,7 +89,12 @@ export interface LedgerSlice {
   /** 與相鄰分類交換 order（-1=往前、+1=往後） */
   moveCategory(id: string, dir: -1 | 1): void;
   setBudget(monthlyTotal: number, perCategory: Readonly<Record<string, number>>): void;
-  /** 掃描入帳：寫記錄 + 商家規則學習（一人歸類、兩機受益——規則會同步） */
+  /**
+   * 掃描入帳：寫記錄 + 商家規則學習（一人歸類、兩機受益——規則會同步）。
+   * 回傳**擋下這次入帳的既存記錄**；null = 真的寫進去了。
+   * 有回傳值的呼叫端絕不可宣告「已記一筆」——預覽卡開著時背景同步可能剛收進
+   * 對方掃的同一張，那使用者剛調的金額/分類/付款人全部丟失，卻以為存好了。
+   */
   saveScanned(input: {
     readonly inv: ParsedInvoice;
     readonly amount: number;
@@ -91,7 +103,7 @@ export interface LedgerSlice {
     readonly note: string;
     readonly merchantName: string;
     readonly paidBy: string;
-  }): void;
+  }): ExpenseRecord | null;
   upsertRule(sellerTaxId: string, categoryId: string, displayName: string): void;
   deleteRule(id: string): void;
 }
@@ -124,6 +136,7 @@ function persist(p: Promise<void>, what: string): void {
 
 export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (set, get) => ({
   hydrated: false,
+  hydrateFailed: false,
   records: new Map(),
   categories: new Map(),
   rules: new Map(),
@@ -135,7 +148,25 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
   async hydrate() {
     try {
       const loaded = await repo.loadAll();
-      // 確保「我」的 Person row 存在（首啟/清空後）：預設名「我」，取名卡/設定頁改
+      // 種回時鐘（審查修正）：localStorage 的 HLC 可能寫失敗（隱私模式/配額滿），
+      // 牆鐘又可能被回撥——以帳本內最大 updatedAt 種回，保證後續 mint 嚴格大於
+      // 一切既存時間戳，單機單調性不再依賴 localStorage 可寫。
+      // **persons 一定要在裡面**：漏掉的話，帳本裡最新的一筆若是人物 row（對方剛改過名），
+      // 種回值就低於它 ⇒ 之後 renameMyPerson mint 的 HLC 更小 ⇒ 下次同步 LWW 判 keep-local，
+      // 自己的新名字被對方那份舊的無聲蓋回去。（syncSlice 的匯入路徑一直是完整的，這裡漏了。）
+      let maxHlc = '';
+      const all: Iterable<{ updatedAt: string }>[] = [
+        loaded.records.values(),
+        loaded.categories.values(),
+        loaded.rules.values(),
+        loaded.persons.values(),
+        loaded.budget ? [loaded.budget] : [],
+      ];
+      for (const it of all) for (const r of it) if (r.updatedAt > maxHlc) maxHlc = r.updatedAt;
+      if (maxHlc) seedClock(maxHlc);
+      // 確保「我」的 Person row 存在（首啟/清空後）：預設名「我」，取名卡/設定頁改。
+      // **排在 seedClock 之後**：這裡 mint 的信封必須大於帳本裡的一切，否則新種的
+      // 人物 row 一同步就輸給對方那邊既有的同 id 舊列。
       let persons = loaded.persons;
       const myId = getPersonId();
       if (!persons.has(myId)) {
@@ -158,26 +189,12 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
         persons,
         budget: loaded.budget,
       });
-      // 種回時鐘（審查修正）：localStorage 的 HLC 可能寫失敗（隱私模式/配額滿），
-      // 牆鐘又可能被回撥——以帳本內最大 updatedAt 種回，保證後續 mint 嚴格大於
-      // 一切既存時間戳，單機單調性不再依賴 localStorage 可寫
-      let maxHlc = '';
-      const all: Iterable<{ updatedAt: string }>[] = [
-        loaded.records.values(),
-        loaded.categories.values(),
-        loaded.rules.values(),
-        loaded.budget ? [loaded.budget] : [],
-      ];
-      for (const it of all) for (const r of it) if (r.updatedAt > maxHlc) maxHlc = r.updatedAt;
-      if (maxHlc) {
-        const { seedClock } = await import('../clock');
-        seedClock(maxHlc);
-      }
     } catch (err) {
-      // IDB 開不起來（隱私模式/損毀）：以空帳本+內建分類啟動，至少可看可記（不落盤）
+      // IDB 開不起來（隱私模式/損毀）：以空帳本+內建分類啟動，至少可看可記（不落盤）。
+      // hydrateFailed 讓同步認得出「這是空的，不是真的沒帳」——見該欄位的註解。
       logError(`hydrate: ${String(err)}`);
       const { seedCategories } = await import('@zhangben/core');
-      set({ hydrated: true, categories: seedCategories() });
+      set({ hydrated: true, hydrateFailed: true, categories: seedCategories() });
       show('saveFailed');
     }
   },
@@ -207,9 +224,9 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
 
   openEntry(init) {
     const s = get();
-    const firstCat = [...s.categories.values()]
-      .filter((c) => !c.deleted)
-      .sort((a, b) => a.order - b.order)[0];
+    // 同樣走 sortCategories：「預設分類」該是使用者在籤條上看到的第一顆，
+    // 各排各的就會在撞號時挑到別的
+    const firstCat = sortCategories(s.categories.values())[0];
     set({
       entryDraft: {
         editingId: null,
@@ -362,9 +379,10 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
 
   saveScanned(input) {
     const s = get();
-    // 最後一道去重閘（UI 已擋；並發掃同一張的窗口期防線）
+    // 最後一道去重閘（UI 已擋；並發掃同一張的窗口期防線）。
+    // 回傳擋路的那筆而不是靜默 return：呼叫端才有辦法把「已經記過」講出來
     for (const r of s.records.values()) {
-      if (r.invoice?.number === input.inv.number && !r.deleted) return;
+      if (r.invoice?.number === input.inv.number && !r.deleted) return r;
     }
     const row: ExpenseRecord = {
       id: uuidv7(),
@@ -398,6 +416,7 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
         input.merchantName || rule?.displayName || '',
       );
     }
+    return null;
   },
 
   upsertRule(sellerTaxId, categoryId, displayName) {
@@ -445,19 +464,27 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
 
   moveCategory(id, dir) {
     const s = get();
-    const alive = [...s.categories.values()].filter((c) => !c.deleted).sort((a, b) => a.order - b.order);
+    // **與 UI 用同一支排序**：這裡原本只按 order 排，而畫面用的是 core 的
+    // sortCategories（order → name → id）。兩者不一致時，按 ▲ 找到的 idx 對應的
+    // 是另一列，跳動的是根本沒被點到的那一顆。
+    const alive = sortCategories(s.categories.values());
     const idx = alive.findIndex((c) => c.id === id);
-    const other = alive[idx + dir];
-    const self = alive[idx];
-    if (!self || !other) return;
-    // 交換 order；兩筆都要 bump 信封（同步後對方才收斂到同一順序）
-    const a: Category = { ...self, order: other.order, updatedAt: tickClock(), deviceId: getDeviceId() };
-    const b: Category = { ...other, order: self.order, updatedAt: tickClock(), deviceId: getDeviceId() };
+    const j = idx + dir;
+    if (idx < 0 || j < 0 || j >= alive.length) return;
+    const reordered = [...alive];
+    [reordered[idx], reordered[j]] = [reordered[j]!, reordered[idx]!];
+    // **重編 1..N 而不是互換 order**：撞號是常態（兩台各自新增分類都算出
+    // maxOrder+1），而撞號時互換 order 是 no-op——畫面毫無反應，卻照樣 bump
+    // 兩個信封同步給對方，那兩顆分類的 ▲▼ 從此永久失效。
+    // 只寫 order 真的變了的列：order 互異時剛好 2 筆，與原本的行為位元相同。
+    const changed = reordered
+      .map((c, i) => ({ c, order: i + 1 }))
+      .filter(({ c, order }) => c.order !== order)
+      .map(({ c, order }): Category => ({ ...c, order, updatedAt: tickClock(), deviceId: getDeviceId() }));
+    if (changed.length === 0) return;
     const categories = new Map(s.categories);
-    categories.set(a.id, a);
-    categories.set(b.id, b);
+    for (const row of changed) categories.set(row.id, row);
     set({ categories });
-    persist(repo.putCategory(a), 'putCategory(order)');
-    persist(repo.putCategory(b), 'putCategory(order)');
+    for (const row of changed) persist(repo.putCategory(row), 'putCategory(order)');
   },
 });

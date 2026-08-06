@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
+import { mergeAll } from '../src/merge';
 import { reconcileInvoiceDuplicates, restoreRecord, type FreshEnvelope } from '../src/reconcile';
 import type { ExpenseRecord } from '../src/types';
 
@@ -21,6 +22,31 @@ function rec(over: Partial<ExpenseRecord> & { id: string }): ExpenseRecord {
 }
 
 const toMap = (rows: ExpenseRecord[]) => new Map(rows.map((r) => [r.id, r]));
+
+/** 模組層（兩個 describe 共用）：號碼取值域刻意只有三個，才會頻繁撞出重複 */
+const arbRecords = fc
+  .array(
+    fc.record({
+      id: fc.hexaString({ minLength: 4, maxLength: 4 }),
+      num: fc.constantFrom('AB11111111', 'AB22222222', 'AB33333333', null),
+      deleted: fc.boolean(),
+    }),
+    { maxLength: 30 },
+  )
+  .map((rows) => {
+    const m = new Map<string, ExpenseRecord>();
+    for (const r of rows) {
+      m.set(
+        r.id,
+        rec({
+          id: r.id,
+          deleted: r.deleted,
+          ...(r.num ? { invoice: { number: r.num, randomCode: '1' } } : {}),
+        }),
+      );
+    }
+    return m;
+  });
 
 describe('reconcileInvoiceDuplicates', () => {
   it('無重複且無帶號墓碑=原 Map 原樣回傳（零配置）', () => {
@@ -61,30 +87,6 @@ describe('reconcileInvoiceDuplicates', () => {
     expect(next.get('b')!.deleted).toBe(false); // 活記錄不受墓碑影響
   });
 
-  const arbRecords = fc
-    .array(
-      fc.record({
-        id: fc.hexaString({ minLength: 4, maxLength: 4 }),
-        num: fc.constantFrom('AB11111111', 'AB22222222', 'AB33333333', null),
-        deleted: fc.boolean(),
-      }),
-      { maxLength: 30 },
-    )
-    .map((rows) => {
-      const m = new Map<string, ExpenseRecord>();
-      for (const r of rows) {
-        m.set(
-          r.id,
-          rec({
-            id: r.id,
-            deleted: r.deleted,
-            ...(r.num ? { invoice: { number: r.num, randomCode: '1' } } : {}),
-          }),
-        );
-      }
-      return m;
-    });
-
   it('property：調和後活號碼唯一、存活者=同號最小 id、無帶號墓碑、冪等、決定論（固定信封下）', () => {
     fc.assert(
       fc.property(arbRecords, (m) => {
@@ -117,6 +119,63 @@ describe('reconcileInvoiceDuplicates', () => {
         const shuffled = new Map([...m.entries()].reverse());
         const again = reconcileInvoiceDuplicates(shuffled, ENV);
         expect(new Map(again.next)).toEqual(new Map(next));
+      }),
+    );
+  });
+});
+
+/**
+ * 跨裝置收斂——這個模組存在的理由，之前只被檔頭的一句話擔保著。
+ *
+ * 上面的 property 只用**單一固定信封**驗冪等與決定論，那等於假設「只有一台裝置
+ * 在調和」。真實情況是兩台各自調和：同一張發票被兩機各掃一次，同步後雙方都看到
+ * 兩筆同號活記錄，於是各自 mint 一個**不同的**信封把敗者轉墓碑。
+ * 檔頭主張「兩側各自 mint 的競爭墓碑由 LWW tie-break 自然收斂」——這裡把它驗出來。
+ */
+describe('reconcileInvoiceDuplicates 跨裝置收斂', () => {
+  const ENV_A: FreshEnvelope = { updatedAt: '000000000000100-0000-aaa', deviceId: 'aaa' };
+  /** 刻意與 A **同 HLC**：逼 mergeRow 走 deviceId tie-break 那條分支 */
+  const ENV_B: FreshEnvelope = { updatedAt: '000000000000100-0000-bbb', deviceId: 'bbb' };
+
+  const norm = (m: ReadonlyMap<string, ExpenseRecord>): ExpenseRecord[] =>
+    [...m.values()].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+
+  /** 兩機各自調和 → 互相 mergeAll → 回傳兩側的最終狀態 */
+  function crossSync(shared: ReadonlyMap<string, ExpenseRecord>) {
+    const a = reconcileInvoiceDuplicates(shared, ENV_A).next;
+    const b = reconcileInvoiceDuplicates(shared, ENV_B).next;
+    return {
+      finalA: mergeAll(a, [...b.values()]).next,
+      finalB: mergeAll(b, [...a.values()]).next,
+    };
+  }
+
+  it('兩機各自把敗者轉墓碑（信封不同）→ 交換後兩側位元相同', () => {
+    const inv = { number: 'AB11111111', randomCode: '1' };
+    const shared = toMap([
+      rec({ id: 'a', invoice: inv, amount: 100 }),
+      rec({ id: 'b', invoice: inv, amount: 100 }),
+    ]);
+    const { finalA, finalB } = crossSync(shared);
+    expect(norm(finalA)).toEqual(norm(finalB));
+    // 收斂到的狀態本身也要合法：'a' 活著帶號、'b' 是無號墓碑
+    expect(finalA.get('a')!.deleted).toBe(false);
+    expect(finalA.get('a')!.invoice).toEqual(inv);
+    expect(finalA.get('b')!.deleted).toBe(true);
+    expect(finalA.get('b')!.invoice).toBeUndefined();
+    // 收斂後再各自調和一次＝無事可做（不會又生出一輪競爭墓碑）
+    expect(reconcileInvoiceDuplicates(finalA, ENV_A).next).toBe(finalA);
+    expect(reconcileInvoiceDuplicates(finalB, ENV_B).next).toBe(finalB);
+  });
+
+  it('property：任意帳本，兩機各自調和後交換必定收斂到同一狀態', () => {
+    fc.assert(
+      fc.property(arbRecords, (shared) => {
+        const { finalA, finalB } = crossSync(shared);
+        expect(norm(finalA)).toEqual(norm(finalB));
+        // 再交換一輪也不再變動（達到不動點，不是在兩個狀態之間震盪）
+        const againA = mergeAll(finalA, [...finalB.values()]).next;
+        expect(norm(againA)).toEqual(norm(finalA));
       }),
     );
   });

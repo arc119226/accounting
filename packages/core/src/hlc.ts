@@ -30,6 +30,20 @@ export interface Hlc {
 /** ctr 的編碼上限（4 位十六進位的極限）；超過就進位到 ms，見檔頭 */
 const CTR_MAX = 0xffff;
 
+/**
+ * wallMs 的入口防線：**非整數會直接毀掉整個 LWW**。
+ *
+ * ms 是唯一會被 padStart(15,'0') 定寬編碼的欄位，而定寬正是「字典序＝全序」的
+ * 根基（merge.ts 熱路徑只比字串、從不解碼）。wallMs=1234.5 會編出
+ * '00000000001234.5'——16 個字元、還帶小數點，定寬破裂、全序報銷，而且沒有
+ * 任何地方會報錯。呼叫端目前是 Date.now()（必為整數）所以踩不到，但這是全案
+ * 唯一「一個輸入就能無聲毀掉全部同步」的類別，值得一道兩個字的防線。
+ * NaN → 0：Math.max(prev.ms, NaN) 是 NaN，同樣會編出壞字串。
+ */
+function safeWall(wallMs: number): number {
+  return Number.isFinite(wallMs) ? Math.trunc(wallMs) : 0;
+}
+
 /** 全新裝置的起點。ms=0 保證任何真實事件（tick 過至少一次）都嚴格大於它。 */
 export function hlcInit(device: string): Hlc {
   return { ms: 0, ctr: 0, device };
@@ -40,7 +54,7 @@ export function hlcInit(device: string): Hlc {
  * ms 不動、只推 ctr——新編輯的 HLC 仍大於舊編輯，LWW 永遠不會出現「新輸舊」。
  */
 export function hlcTick(prev: Hlc, wallMs: number): Hlc {
-  const ms = Math.max(prev.ms, wallMs);
+  const ms = Math.max(prev.ms, safeWall(wallMs));
   if (ms === prev.ms) {
     // ms 沒前進 → 靠 ctr 區分同毫秒（或牆鐘倒退期間）的事件；溢位則進位
     return prev.ctr >= CTR_MAX
@@ -57,7 +71,7 @@ export function hlcTick(prev: Hlc, wallMs: number): Hlc {
  * 這保證「收到後馬上編輯」產生的時間戳必然壓過剛收到的那筆，因果不倒置。
  */
 export function hlcRecv(prev: Hlc, remote: Hlc, wallMs: number): Hlc {
-  const ms = Math.max(prev.ms, remote.ms, wallMs);
+  const ms = Math.max(prev.ms, remote.ms, safeWall(wallMs));
   // 論文的 ctr 分支：ms 停在誰身上，就從誰的 ctr 之後繼續數
   let ctr: number;
   if (ms === prev.ms && ms === remote.ms) {

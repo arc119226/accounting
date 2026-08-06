@@ -49,10 +49,13 @@ const savedThisSession = new Set<string>();
 function PreviewCard({
   inv,
   onSaved,
+  onBlocked,
   onRescan,
 }: {
   inv: ParsedInvoice;
   onSaved: (invoiceNumber: string) => void;
+  /** 按下入帳的瞬間才發現這張已經有了（背景同步剛收進對方掃的同一張） */
+  onBlocked: (rec: ExpenseRecord) => void;
   onRescan: () => void;
 }) {
   const categories = useAppStore((s) => s.categories);
@@ -168,7 +171,7 @@ function PreviewCard({
           className="primary-btn"
           disabled={!amount}
           onClick={() => {
-            saveScanned({
+            const blocked = saveScanned({
               inv,
               amount: amount!,
               date,
@@ -177,6 +180,12 @@ function PreviewCard({
               merchantName: merchantName.trim(),
               paidBy,
             });
+            // 去重閘擋下來時**不可以**照樣說「已記一筆」：剛才在這張卡上調的
+            // 金額／分類／付款人一個都沒存進去，改把既存的那筆攤開給他看
+            if (blocked) {
+              onBlocked(blocked);
+              return;
+            }
             show('saved', `${ENTRY.savedNew}${formatNTD(amount!)}`);
             onSaved(inv.number);
           }}
@@ -388,7 +397,12 @@ export function ScanScreen() {
         <div className="scan-result">
           {/* onSaved ≠ onRescan：兩者原本都是 resumeScan，掃描迴圈於是分不出
               「剛存完」和「使用者要重掃」——分開才有辦法只略過前者 */}
-          <PreviewCard inv={result.inv} onSaved={onSaved} onRescan={resumeScan} />
+          <PreviewCard
+            inv={result.inv}
+            onSaved={onSaved}
+            onBlocked={(rec) => setResult({ kind: 'exists', rec })}
+            onRescan={resumeScan}
+          />
         </div>
       )}
 
