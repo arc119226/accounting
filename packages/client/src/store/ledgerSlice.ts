@@ -10,7 +10,7 @@ import type { Budget, Category, ExpenseRecord, MerchantRule, ParsedInvoice, Pers
 import { monthOf, restoreRecord as coreRestoreRecord } from '@zhangben/core';
 import type { AppStore } from './appStore';
 import * as repo from '../db/repo';
-import { tickClock } from '../clock';
+import { seedClock, tickClock } from '../clock';
 import { getDeviceId, getPersonId, uuidv7 } from '../ids';
 import { logError } from '../errlog';
 import { show } from '../notice';
@@ -54,6 +54,13 @@ export interface EntryValues {
 
 export interface LedgerSlice {
   hydrated: boolean;
+  /**
+   * hydrate 走了 catch（IDB 開不起來）⇒ 記憶體是**空帳本**而不是「真的沒帳」。
+   * 與 hydrated 分開一個旗標的理由：hydrated 同時是 UI 的渲染閘（NameGate/SyncScreen），
+   * 失敗時不能不設；但同步**絕不可以**在這個狀態下入房——空帳本握手會把 checkpoint
+   * 推到頂，這台的整本帳從此不再增量傳給對方（見 syncSlice.begin）。
+   */
+  hydrateFailed: boolean;
   records: Map<string, ExpenseRecord>;
   categories: Map<string, Category>;
   rules: Map<string, MerchantRule>;
@@ -124,6 +131,7 @@ function persist(p: Promise<void>, what: string): void {
 
 export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (set, get) => ({
   hydrated: false,
+  hydrateFailed: false,
   records: new Map(),
   categories: new Map(),
   rules: new Map(),
@@ -135,7 +143,25 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
   async hydrate() {
     try {
       const loaded = await repo.loadAll();
-      // 確保「我」的 Person row 存在（首啟/清空後）：預設名「我」，取名卡/設定頁改
+      // 種回時鐘（審查修正）：localStorage 的 HLC 可能寫失敗（隱私模式/配額滿），
+      // 牆鐘又可能被回撥——以帳本內最大 updatedAt 種回，保證後續 mint 嚴格大於
+      // 一切既存時間戳，單機單調性不再依賴 localStorage 可寫。
+      // **persons 一定要在裡面**：漏掉的話，帳本裡最新的一筆若是人物 row（對方剛改過名），
+      // 種回值就低於它 ⇒ 之後 renameMyPerson mint 的 HLC 更小 ⇒ 下次同步 LWW 判 keep-local，
+      // 自己的新名字被對方那份舊的無聲蓋回去。（syncSlice 的匯入路徑一直是完整的，這裡漏了。）
+      let maxHlc = '';
+      const all: Iterable<{ updatedAt: string }>[] = [
+        loaded.records.values(),
+        loaded.categories.values(),
+        loaded.rules.values(),
+        loaded.persons.values(),
+        loaded.budget ? [loaded.budget] : [],
+      ];
+      for (const it of all) for (const r of it) if (r.updatedAt > maxHlc) maxHlc = r.updatedAt;
+      if (maxHlc) seedClock(maxHlc);
+      // 確保「我」的 Person row 存在（首啟/清空後）：預設名「我」，取名卡/設定頁改。
+      // **排在 seedClock 之後**：這裡 mint 的信封必須大於帳本裡的一切，否則新種的
+      // 人物 row 一同步就輸給對方那邊既有的同 id 舊列。
       let persons = loaded.persons;
       const myId = getPersonId();
       if (!persons.has(myId)) {
@@ -158,26 +184,12 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
         persons,
         budget: loaded.budget,
       });
-      // 種回時鐘（審查修正）：localStorage 的 HLC 可能寫失敗（隱私模式/配額滿），
-      // 牆鐘又可能被回撥——以帳本內最大 updatedAt 種回，保證後續 mint 嚴格大於
-      // 一切既存時間戳，單機單調性不再依賴 localStorage 可寫
-      let maxHlc = '';
-      const all: Iterable<{ updatedAt: string }>[] = [
-        loaded.records.values(),
-        loaded.categories.values(),
-        loaded.rules.values(),
-        loaded.budget ? [loaded.budget] : [],
-      ];
-      for (const it of all) for (const r of it) if (r.updatedAt > maxHlc) maxHlc = r.updatedAt;
-      if (maxHlc) {
-        const { seedClock } = await import('../clock');
-        seedClock(maxHlc);
-      }
     } catch (err) {
-      // IDB 開不起來（隱私模式/損毀）：以空帳本+內建分類啟動，至少可看可記（不落盤）
+      // IDB 開不起來（隱私模式/損毀）：以空帳本+內建分類啟動，至少可看可記（不落盤）。
+      // hydrateFailed 讓同步認得出「這是空的，不是真的沒帳」——見該欄位的註解。
       logError(`hydrate: ${String(err)}`);
       const { seedCategories } = await import('@zhangben/core');
-      set({ hydrated: true, categories: seedCategories() });
+      set({ hydrated: true, hydrateFailed: true, categories: seedCategories() });
       show('saveFailed');
     }
   },

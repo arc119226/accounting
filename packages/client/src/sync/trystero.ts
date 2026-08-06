@@ -41,7 +41,15 @@ export interface SyncDeps {
   /** 殼要串流的本地資料（呼叫當下的快照） */
   getLocalRows(kind: SyncKind): readonly Syncable[];
   /** 套用一批（同步決策 set + 落盤），失敗必須 throw（走 apply-failed，不存 checkpoint） */
-  applyBatch(kind: SyncKind, rows: readonly Syncable[]): Promise<{ summary: { added: number; updated: number; skipped: number; deletes: number }; deduped: number }>;
+  applyBatch(
+    kind: SyncKind,
+    rows: readonly Syncable[],
+  ): Promise<{
+    summary: { added: number; updated: number; skipped: number; deletes: number };
+    deduped: number;
+    /** 沒通過 rowSchema、被丟掉的列數（不影響協定：receivedRows 數的是「到達的」） */
+    rejected: number;
+  }>;
   /** 吸收對端時鐘 + 檔案化 checkpoint */
   onPeerHello(peer: PeerHello): void;
   saveCheckpoint(peer: PeerHello, checkpoint: string): void;
@@ -59,7 +67,11 @@ export function startSync(code: string, my: PeerHello, deps: SyncDeps): SyncHand
   let joinTimer: ReturnType<typeof setTimeout> | null = null;
   let stallTimer: ReturnType<typeof setTimeout> | null = null;
   let closed = false;
-  let sendMsg: ((msg: SyncMsg) => void) | null = null;
+  // 回傳 Promise 而非 void（審查修正）：action.send 是 Promise<void>，把它丟掉的話
+  // stream-batches 的 await 就 await 到 undefined ⇒ 所有 batch 同時灌進同一條
+  // DataChannel ⇒ 撞 trystero 的 10 秒 backpressure 逾時（它會**靜默截斷**訊息但照樣
+  // resolve）⇒ 對面收不齊、永不 ack、雙方 stall。逐批序列化本來就是這裡的原意。
+  let sendMsg: ((msg: SyncMsg) => Promise<void>) | null = null;
   /** 套用必須序列化：同 kind 的批次亂序套用會讓「批內較新列」被後到的舊批蓋掉 */
   let applyChain: Promise<void> = Promise.resolve();
 
@@ -84,11 +96,9 @@ export function startSync(code: string, my: PeerHello, deps: SyncDeps): SyncHand
     for (const fx of effects) {
       switch (fx.f) {
         case 'send':
-          try {
-            void sendMsg?.(fx.msg);
-          } catch (err) {
-            logError(`sync send: ${String(err)}`);
-          }
+          // 效果清單是同步跑的、沒人 await 這裡 ⇒ 失敗只能用 .catch 接
+          // （同步 try/catch 接不到 Promise 的 rejection，那等於沒有 errlog）
+          void sendMsg?.(fx.msg).catch((err: unknown) => logError(`sync send: ${String(err)}`));
           break;
         case 'stream-batches': {
           deps.onPeerHello(fx.peer);
@@ -120,7 +130,7 @@ export function startSync(code: string, my: PeerHello, deps: SyncDeps): SyncHand
           applyChain = applyChain.then(async () => {
             try {
               const r = await deps.applyBatch(kind, rows);
-              dispatch({ e: 'applied', kind, summary: r.summary, deduped: r.deduped });
+              dispatch({ e: 'applied', kind, summary: r.summary, deduped: r.deduped, rejected: r.rejected });
             } catch (err) {
               // 落盤失敗**不可**偽裝成 applied——協定會照樣完成並存 checkpoint，
               // 該批資料從此永不重送。走 apply-failed=error、不存 checkpoint、下次重送。
@@ -170,7 +180,7 @@ export function startSync(code: string, my: PeerHello, deps: SyncDeps): SyncHand
     // 慢鏈路上的大批次傳輸以 onProgress/onReceiveProgress 逐 chunk 重上發條——
     // 「還在動的傳輸」不是 stall；20 秒只在真正雙向失聲時觸發。
     const action = room.makeAction('m');
-    sendMsg = (msg) => void action.send(msg as never, { onProgress: () => armStall() });
+    sendMsg = (msg) => action.send(msg as never, { onProgress: () => armStall() });
     action.onReceiveProgress = () => armStall();
     action.onMessage = (data) => {
       armStall();

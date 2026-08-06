@@ -71,7 +71,7 @@ function runFx(self: Sim, other: Sim, fx: SyncEffect): void {
     }
     case 'apply':
       // 殼層套用後回報 applied（本測試以固定摘要代替真實合併）
-      self.inbox.push({ e: 'applied', kind: fx.kind, summary: SUM, deduped: 0 });
+      self.inbox.push({ e: 'applied', kind: fx.kind, summary: SUM, deduped: 0, rejected: 0 });
       break;
     case 'save-checkpoint':
       self.saved = { checkpoint: fx.checkpoint };
@@ -175,7 +175,7 @@ describe('sync 協定（雙 reducer 對打）', () => {
     [s, fx] = syncReduce(s, { e: 'msg', msg: { t: 'done', totalSent: 1 } });
     // 批還沒套完：不可送 ack
     expect(fx.every((f) => !(f.f === 'send' && f.msg.t === 'ack'))).toBe(true);
-    [s, fx] = syncReduce(s, { e: 'applied', kind: 'records', summary: SUM, deduped: 0 });
+    [s, fx] = syncReduce(s, { e: 'applied', kind: 'records', summary: SUM, deduped: 0, rejected: 0 });
     expect(fx.some((f) => f.f === 'send' && f.msg.t === 'ack')).toBe(true);
   });
 
@@ -186,7 +186,7 @@ describe('sync 協定（雙 reducer 對打）', () => {
     // 對方送了 2 批共 3 列，第一批（2 列）被 wire 靜默截斷——只收到第二批
     let fx: SyncEffect[];
     [s, fx] = syncReduce(s, { e: 'msg', msg: { t: 'batch', kind: 'records', rows: [row('r3')], seq: 2 } });
-    [s] = syncReduce(s, { e: 'applied', kind: 'records', summary: SUM, deduped: 0 });
+    [s] = syncReduce(s, { e: 'applied', kind: 'records', summary: SUM, deduped: 0, rejected: 0 });
     [s, fx] = syncReduce(s, { e: 'msg', msg: { t: 'done', totalSent: 3 } });
     // 列數對不上：批次都套完了也不准 ack
     expect(s.receivedRows).toBe(1);

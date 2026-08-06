@@ -34,6 +34,13 @@ function SummaryCard({ totals, onClose }: { totals: SyncTotals; onClose: () => v
             <b className="over-red">{totals.deduped}{SYNC.unit}</b>
           </>
         )}
+        {/* 丟掉的列一定要說：靜默丟資料就是這一輪在修的病，自己不能犯 */}
+        {totals.rejected > 0 && (
+          <>
+            <span className="over-red">{SYNC.summaryRejected}</span>
+            <b className="over-red">{totals.rejected}{SYNC.unit}</b>
+          </>
+        )}
       </div>
       <button className="ghost-btn" onClick={onClose}>{SYNC.close}</button>
     </div>
@@ -95,6 +102,7 @@ export function SyncScreen() {
   const exportLedger = useAppStore((s) => s.exportLedger);
   const importLedger = useAppStore((s) => s.importLedger);
   const hydrated = useAppStore((s) => s.hydrated);
+  const hydrateFailed = useAppStore((s) => s.hydrateFailed);
   const pendingJoin = useAppStore((s) => s.pendingJoin);
   const clearPendingJoin = useAppStore((s) => s.clearPendingJoin);
 
@@ -120,13 +128,17 @@ export function SyncScreen() {
   useEffect(() => {
     if (!hydrated || !pendingJoin) return;
     clearPendingJoin();
+    // hydrate 失敗時 records 必為空，走下面的 emptyGate 會給出**錯誤的解釋**
+    // （「這個瀏覽器沒有帳本」）。空是因為讀不到，不是因為沒有——卡片上的
+    // hydrateFailed 說明已經在畫面上，這裡直接不入房就好。
+    if (hydrateFailed) return;
     let hasLedger = false;
     for (const r of records.values()) {
       if (!r.deleted) { hasLedger = true; break; }
     }
     if (hasLedger) joinSync(pendingJoin);
     else setEmptyGate(pendingJoin);
-  }, [hydrated, pendingJoin, clearPendingJoin, joinSync, records]);
+  }, [hydrated, hydrateFailed, pendingJoin, clearPendingJoin, joinSync, records]);
 
   const active = session !== null && (session.phase === 'waiting' || session.phase === 'exchanging');
   const errText =
@@ -145,7 +157,11 @@ export function SyncScreen() {
           {SYNC.p2pTitle.slice(1)}
         </div>
 
-        {!session && !joinMode && (
+        {/* 讀不到本機帳本時**不給入口**：syncSlice.begin 那道閘會擋下來，但擋而不說
+            就變成「按了沒反應」。兩顆鈕連同 joinMode 的後續畫面一起收起來。 */}
+        {!session && hydrateFailed && <p className="sync-err over-red">{SYNC.hydrateFailed}</p>}
+
+        {!session && !joinMode && !hydrateFailed && (
           <>
             <p className="dim-text">{SYNC.p2pDesc}</p>
             <div className="modal-actions">

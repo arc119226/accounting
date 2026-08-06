@@ -150,6 +150,10 @@ export const SYNC = {
     + '在這裡同步只會把帳複製到這個用完就丟的分頁——請回主畫面開柴米帳，'
     + '再用 App 內的「掃對方的碼」。若你是在新手機上要還原備份，才選下面那個。',
   emptyGateForce: '我確定要在這裡同步',
+  hydrateFailed:
+    '這台裝置讀不到本機帳本（儲存空間被回收，或另一個分頁正佔著），'
+    + '現在畫面上是空的。此時同步會讓對方以為你的帳都沒了——請先完全關掉柴米帳再開一次；'
+    + '若仍是空的，改用「匯入帳本」還原最近一次備份。',
   waiting: '等待另一半的手機加入…',
   exchanging: '同步中…',
   doneTitle: '合併完成',
@@ -167,6 +171,7 @@ export const SYNC = {
   summaryDeletes: '刪除傳播',
   summarySkipped: '略過',
   summaryDeduped: '發票去重',
+  summaryRejected: '格式不符拒收',
   unit: ' 筆',
   peersTitle: '同步對象',
   lastSync: '上次同步：',
