@@ -4,27 +4,47 @@
    讓位距離必須跟著 FAB 一起長。 */
 .ledger-body { padding-bottom: max(90px, calc(1.6em + 44px)); touch-action: pan-y; }
 
-/* 月份與合計分兩列：擠成一列時（19px 毛筆月份＋合計＋兩顆 44px 箭頭）在 360px 機上要 ~349px，
-   只能靠 .screen-body 的 16px 內距硬撐＝箭頭貼死螢幕邊（Android 邊緣返回手勢區），
-   而系統字級一放大就直接爆版——爆了還碰不到，因為 .ledger-body 的 touch-action:pan-y
-   擋掉橫向手勢。拆成兩列後只要 267px，餘裕 61px，再不夠就換行而不是溢出。 */
+/* 月份與合計分兩列：擠成一列時（毛筆月份＋合計＋兩顆箭頭）在 360px 機上要 ~349px，
+   只能靠 .screen-body 的 16px 內距硬撐＝箭頭貼死螢幕邊（Android 邊緣返回手勢區）。
+   **外層是 column 不是 flex-wrap**：wrap 的斷行用的是 hypothetical size（先斷行、後收縮），
+   所以橫幅一變寬會直接把「›」擠到第二列，而不是先把橫幅縮窄——實測 364px + 140% 字級
+   就是這樣把月份列撐成三行 197px 高。column 讓合計必然在第二列，箭頭則交給 .month-row。
+   10px 的 gap 不是 4：4 剛好等於卷軸木軸 ::before/::after 的 top/bottom:-4px，會零間隙相接。 */
 .month-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+/* 三顆同列且**永不換行**——橫幅自己收縮並內部換行（它已是 white-space: normal）。
+   gap 10 不是 14：把省下的 8px 讓給橫幅，使用者的 140% 字級剛好還能維持單行。 */
+.month-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  /* 10 不是 4：4 剛好等於 .scroll-banner 木軸 ::before/::after 的 top/bottom:-4px，
-     木軸底緣與第二列頂緣零間隙相接，字級一放大就疊在一起 */
-  row-gap: 10px;
+  gap: 10px;
+  width: 100%;
 }
-.month-arrow { font-size: 20px; min-width: max(44px, 2.75em); }
-/* nowrap（來自 .scroll-banner）在大字級下會讓月份字畫到卷軸紙面外。
-   允許橫幅內部換行，兩顆箭頭就永遠留在同一列，木軸也跟著長高。 */
-.month-banner { display: block; white-space: normal; text-align: center; }
-.month-total {
-  flex-basis: 100%;
+/* 圖示鈕的觸控下限要有**上限**：手指不會隨字級變大，會變大的只是裡面那個字。
+   不封頂的話 2.75em 在 200% 字級是 88px，兩顆箭頭吃掉 176px，把月份橫幅擠成四行。
+   這兩顆再收到 56（仍遠高於 44 下限）：省下的 16px 讓月份在 140% 字級也維持單行，
+   而「‹」只是一個字元，56px 的命中區綽綽有餘。 */
+.month-arrow { font-size: 20px; min-width: clamp(44px, 2.75em, 56px); flex: 0 0 auto; }
+/* min-width:0 是必要條件：不寫的話自動最小尺寸＝min-content，橫幅縮不下去就會撐破整列。
+   nowrap（來自 .scroll-banner）也要解除，否則裡面的字會畫到卷軸紙面外。 */
+.month-banner {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: normal;
   text-align: center;
+  text-wrap: balance; /* 真的裝不下而折行時，兩行分得平均一點 */
+  /* 比 .scroll-banner 的 26px 窄：木軸只佔到內距的 6px 處，20px 綽綽有餘，
+     省下的 12px 讓月份在放大字級下還能維持單行（同步頁的橫幅不受影響）。 */
+  padding-left: 20px;
+  padding-right: 20px;
+}
+.month-total {
   font-size: 13px;
   /* 離開卷軸紙面就該用頁面的暗墨，不是紙上墨 */
   color: var(--dim);
