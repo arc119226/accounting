@@ -1,10 +1,14 @@
 {
   // Cloudflare 部署設定：純靜態資產（無 Worker main、無 Durable Objects）。
-  // 部署：`pnpm build && npx wrangler deploy`（首次會引導登入 Cloudflare 帳號）。
-  // 之後要接自訂網域：在下方加 "routes": [{ "pattern": "<domain>", "custom_domain": true }]
-  // （前提：該 zone 已接入同一 Cloudflare 帳號，比照 super-reversi2 的做法）。
-  "name": "zhangben",
+  // 儀表板是 Workers Builds（Git 連結 Worker）：Build command=`pnpm build`、
+  // Deploy command=`npx wrangler deploy`——deploy 靠本檔的 name 定位目標 Worker，
+  // **name 必須與儀表板建立的 Worker 同名**，否則會部署到另一個同帳號的新 Worker，
+  // 綁了網域的那個永遠停在 Hello World 範本（實際踩過）。
+  "name": "accounting",
   "workers_dev": true,
+  // 正式域：deploy 時自動建 DNS+憑證（前提：arc.idv.tw zone 在同一 Cloudflare 帳號，
+  // 比照 super-reversi2 的 reversi2.arc.idv.tw）
+  "routes": [{ "pattern": "accounting.arc.idv.tw", "custom_domain": true }],
   "compatibility_date": "2026-08-01",
   "assets": {
     "directory": "./packages/client/dist",
