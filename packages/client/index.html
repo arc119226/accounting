@@ -22,7 +22,27 @@
       html { height: 100vh; height: 100dvh; }
       /* styles.css（main.tsx 才載）前的底色：與 :root 紙色一致，避免白閃 */
       body { background: #e7dcc3; color: #2a2118; font-family: system-ui, 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+      /* 夜墨的首漆。上面那條是宣紙（預設），這條在 data-theme 已被下面的 script
+         貼上時接手——兩份底色都由 test/styles.test.ts 鎖住＝base.css 的 --bg。 */
+      html[data-theme='ink'] body { background: #17140f; color: #ece2cc; }
     </style>
+    <!-- 首漆定調：**必須跑在 styles.css 之前**，否則夜墨使用者每次開 app 都會先閃一下白紙。
+         這裡是 src/theme.ts resolveTheme() 的手抄本（那支才是正典）；只讀 localStorage
+         不碰 store，因為 store 要等 JS bundle。整段包 try：localStorage 在隱私模式會 throw，
+         而首漆失敗的代價是「閃一下」，不該連帶讓整個 app 開不起來。 -->
+    <script>
+      try {
+        var s = JSON.parse(localStorage.getItem('zb.settings') || '{}');
+        var pref = s && s.theme;
+        // 與 resolveTheme() 同一條規則：ink 一律深，system 看系統，其餘（含缺值）走宣紙
+        var dark = pref === 'ink' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) {
+          document.documentElement.setAttribute('data-theme', 'ink');
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', '#17140f');
+        }
+      } catch (e) { /* 隱私模式讀不到=用預設宣紙，只是少了首漆最佳化 */ }
+    </script>
   </head>
   <body>
     <div id="root"></div>

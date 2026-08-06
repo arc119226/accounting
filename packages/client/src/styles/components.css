@@ -38,7 +38,7 @@
   cursor: pointer;
 }
 .danger-btn:hover { filter: brightness(1.1); }
-.danger-ghost:hover { border-color: var(--red) !important; color: var(--red) !important; }
+.danger-ghost:hover { border-color: var(--red-ink) !important; color: var(--red-ink) !important; }
 
 /* 分段控制（paidBy/統計區間用） */
 .seg { display: flex; gap: 6px; flex: 1; min-width: 0; }
@@ -85,8 +85,8 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 .seal-char {
   display: inline-block;
   font-family: var(--font-display);
-  color: var(--red);
-  border: 1.5px solid var(--red);
+  color: var(--red-ink);
+  border: 1.5px solid var(--red-ink);
   border-radius: 4px;
   padding: 0 4px;
   font-size: 0.82em;

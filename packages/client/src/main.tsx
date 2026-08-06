@@ -8,6 +8,7 @@ import { initKeyboardInsets } from './keyboard';
 import { show } from './notice';
 import { useAppStore } from './store/appStore';
 import { parseSyncLink } from './sync/deepLink';
+import { applyTheme, watchSystemTheme } from './theme';
 import './styles.css';
 
 // 可觀測性：render 前掛全域錯誤日誌（ErrorBoundary 接不到的 async/動態 import 全在這）
@@ -16,6 +17,10 @@ initErrorLog(APP_VERSION);
 initUpdateCheck();
 // 軟鍵盤讓位：量 visualViewport 寫 --kb（iOS 專用；Android 靠 viewport meta 自己縮）
 initKeyboardInsets();
+// 主題：index.html 的首漆 script 已經把 data-theme 定好（避免閃白），這裡是**接手**——
+// styles.css 已載入，所以現在才讀得到算出來的 --bg 去更新 theme-color。
+applyTheme(useAppStore.getState().settings.theme);
+watchSystemTheme(() => useAppStore.getState().settings.theme);
 // 設定寫失敗=session 內提示一次（saveJson 原契約靜默不變，只多掛通知）
 let saveErrNotified = false;
 setSaveErrorHandler(() => {

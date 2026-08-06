@@ -49,8 +49,8 @@
   min-height: max(44px, 2.75em); /* 沒有刪除鈕時也維持同高，新增/編輯兩模式不跳版 */
 }
 /* 刪除走硃砂印章語彙而非灰框：抽屜裡唯一不可逆的操作要看得出來 */
-.sheet-head-row .corner-btn { border-color: var(--red); }
-.sheet-head-row .corner-seal { color: var(--red); }
+.sheet-head-row .corner-btn { border-color: var(--red-ink); }
+.sheet-head-row .corner-seal { color: var(--red-ink); }
 
 /* 全抽屜唯一的捲動區。min-height:0 是必要條件——flex item 的 min-height:auto 會擋住收縮，
    少了它就變成整個抽屜溢出、頭尾一起被推出去。 */
