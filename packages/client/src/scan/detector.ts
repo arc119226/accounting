@@ -47,6 +47,12 @@ async function create(): Promise<QrDetector> {
 }
 
 export function getDetector(): Promise<QrDetector> {
-  detectorPromise ??= create();
+  // 失敗要能重試：`??=` 對已存在的 rejected promise 不會重來，一次 wasm/chunk
+  // fetch 失敗（電梯裡沒訊號、部署間隙的 404）就會讓掃描到**關掉 app 重開**前
+  // 都是死的——連退路的【拍照辨識】也走這條。清掉快取再 rethrow，下次再試。
+  detectorPromise ??= create().catch((err: unknown) => {
+    detectorPromise = null;
+    throw err;
+  });
   return detectorPromise;
 }

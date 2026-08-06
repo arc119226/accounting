@@ -89,7 +89,12 @@ export interface LedgerSlice {
   /** 與相鄰分類交換 order（-1=往前、+1=往後） */
   moveCategory(id: string, dir: -1 | 1): void;
   setBudget(monthlyTotal: number, perCategory: Readonly<Record<string, number>>): void;
-  /** 掃描入帳：寫記錄 + 商家規則學習（一人歸類、兩機受益——規則會同步） */
+  /**
+   * 掃描入帳：寫記錄 + 商家規則學習（一人歸類、兩機受益——規則會同步）。
+   * 回傳**擋下這次入帳的既存記錄**；null = 真的寫進去了。
+   * 有回傳值的呼叫端絕不可宣告「已記一筆」——預覽卡開著時背景同步可能剛收進
+   * 對方掃的同一張，那使用者剛調的金額/分類/付款人全部丟失，卻以為存好了。
+   */
   saveScanned(input: {
     readonly inv: ParsedInvoice;
     readonly amount: number;
@@ -98,7 +103,7 @@ export interface LedgerSlice {
     readonly note: string;
     readonly merchantName: string;
     readonly paidBy: string;
-  }): void;
+  }): ExpenseRecord | null;
   upsertRule(sellerTaxId: string, categoryId: string, displayName: string): void;
   deleteRule(id: string): void;
 }
@@ -374,9 +379,10 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
 
   saveScanned(input) {
     const s = get();
-    // 最後一道去重閘（UI 已擋；並發掃同一張的窗口期防線）
+    // 最後一道去重閘（UI 已擋；並發掃同一張的窗口期防線）。
+    // 回傳擋路的那筆而不是靜默 return：呼叫端才有辦法把「已經記過」講出來
     for (const r of s.records.values()) {
-      if (r.invoice?.number === input.inv.number && !r.deleted) return;
+      if (r.invoice?.number === input.inv.number && !r.deleted) return r;
     }
     const row: ExpenseRecord = {
       id: uuidv7(),
@@ -410,6 +416,7 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
         input.merchantName || rule?.displayName || '',
       );
     }
+    return null;
   },
 
   upsertRule(sellerTaxId, categoryId, displayName) {
