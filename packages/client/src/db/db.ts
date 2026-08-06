@@ -6,7 +6,7 @@
  * 開機批次讀。所以選 idb（1.2KB）而非 dexie 的查詢 DSL。
  */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Budget, Category, ExpenseRecord, MerchantRule } from '@zhangben/core';
+import type { Budget, Category, ExpenseRecord, MerchantRule, Person } from '@zhangben/core';
 
 export interface ZbDB extends DBSchema {
   records: {
@@ -21,6 +21,8 @@ export interface ZbDB extends DBSchema {
   };
   categories: { key: string; value: Category };
   rules: { key: string; value: MerchantRule };
+  /** 人物（v2）：uuid 為鍵的同步實體 */
+  persons: { key: string; value: Person };
   /** 單例同步實體（budget；未來擴充也放這）——keyPath id，與 mergeAll 相容 */
   singletons: { key: string; value: Budget };
   /** 本機雜項（不同步）：peers 名單等。key 顯式字串。 */
@@ -28,7 +30,7 @@ export interface ZbDB extends DBSchema {
 }
 
 const DB_NAME = 'zhangben';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<ZbDB>> | null = null;
 
@@ -43,12 +45,18 @@ export async function closeDbForTests(): Promise<void> {
 
 export function getDb(): Promise<IDBPDatabase<ZbDB>> {
   dbPromise ??= openDB<ZbDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion) {
+      // v1→v2 是**清空重來**（使用者決策：paidBy 從 A/B 槽位改 person uuid，
+      // 正式資料尚未開始記、不做遷移）：舊 stores 全刪重建，peers/checkpoint 一併歸零。
+      if (oldVersion > 0) {
+        for (const name of [...db.objectStoreNames]) db.deleteObjectStore(name);
+      }
       const records = db.createObjectStore('records', { keyPath: 'id' });
       records.createIndex('by-date', 'date');
       records.createIndex('by-invoice', 'invoice.number', { unique: true });
       db.createObjectStore('categories', { keyPath: 'id' });
       db.createObjectStore('rules', { keyPath: 'id' });
+      db.createObjectStore('persons', { keyPath: 'id' });
       db.createObjectStore('singletons', { keyPath: 'id' });
       db.createObjectStore('meta');
     },

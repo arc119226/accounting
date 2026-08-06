@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import type { Budget, ExpenseRecord, PersonId } from '../src/types';
+import type { Budget, ExpenseRecord } from '../src/types';
 import { budgetProgress } from '../src/budget';
 import type { BudgetProgress } from '../src/budget';
 import { daysInMonth } from '../src/rocdate';
@@ -45,7 +45,7 @@ const recordArb: fc.Arbitrary<ExpenseRecord> = fc.record({
   date: dateArb,
   categoryId: fc.constantFrom(...CATEGORY_POOL),
   note: fc.constant(''),
-  paidBy: fc.constantFrom<PersonId>('A', 'B'),
+  paidBy: fc.constantFrom('p-alice', 'p-bob'),
   source: fc.constantFrom<'manual' | 'einvoice'>('manual', 'einvoice'),
 });
 

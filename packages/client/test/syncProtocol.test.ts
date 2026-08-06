@@ -18,8 +18,8 @@ import {
 function hello(device: string, hlc: string): PeerHello {
   return {
     deviceId: device,
-    person: device === 'aaa' ? 'A' : 'B',
-    personNames: { A: '甲', B: '乙' },
+    personId: `person-${device}`,
+    personName: device === 'aaa' ? '甲' : '乙',
     hlcNow: hlc,
     wallMs: 1000,
     checkpoints: {},

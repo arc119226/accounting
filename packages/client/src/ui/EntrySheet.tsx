@@ -4,8 +4,10 @@
  * 重複防呆：同日同額同人 → ConfirmDialog 警告不硬擋。
  */
 import { useState } from 'react';
-import { formatNTD, sortCategories, type PersonId } from '@zhangben/core';
+import { formatNTD, sortCategories } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
+import { getPersonId } from '../ids';
+import { sortPersonsForTabs } from '../personView';
 import { findDuplicate, todayISO, type EntryValues } from '../store/ledgerSlice';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ENTRY } from '../strings/ui';
@@ -23,7 +25,7 @@ function yesterdayISO(): string {
 export function EntrySheet() {
   const draft = useAppStore((s) => s.entryDraft);
   const categories = useAppStore((s) => s.categories);
-  const settings = useAppStore((s) => s.settings);
+  const persons = useAppStore((s) => s.persons);
   const closeEntry = useAppStore((s) => s.closeEntry);
   const saveEntry = useAppStore((s) => s.saveEntry);
   const deleteRecord = useAppStore((s) => s.deleteRecord);
@@ -33,7 +35,7 @@ export function EntrySheet() {
   const [categoryId, setCategoryId] = useState(draft?.categoryId ?? 'cat-misc');
   const [note, setNote] = useState(draft?.note ?? '');
   const [merchantName, setMerchantName] = useState(draft?.merchantName ?? '');
-  const [paidBy, setPaidBy] = useState<PersonId>(draft?.paidBy ?? settings.myPerson);
+  const [paidBy, setPaidBy] = useState<string>(draft?.paidBy ?? getPersonId());
   const [showDatePick, setShowDatePick] = useState(false);
   const [confirm, setConfirm] = useState<'none' | 'dup' | 'delete'>('none');
 
@@ -101,9 +103,9 @@ export function EntrySheet() {
           <div className="entry-fields">
             <label className="field-label">{ENTRY.paidByLabel}</label>
             <div className="seg">
-              {(['A', 'B'] as const).map((p) => (
-                <button key={p} className={`seg-btn${paidBy === p ? ' active' : ''}`} onClick={() => setPaidBy(p)}>
-                  {settings.personNames[p]}
+              {sortPersonsForTabs(persons).map((p) => (
+                <button key={p.id} className={`seg-btn${paidBy === p.id ? ' active' : ''}`} onClick={() => setPaidBy(p.id)}>
+                  {p.name}
                 </button>
               ))}
             </div>

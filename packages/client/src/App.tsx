@@ -13,6 +13,7 @@ import { CategoriesScreen } from './ui/CategoriesScreen';
 import { SettingsScreen } from './ui/SettingsScreen';
 import { StatsScreen } from './ui/StatsScreen';
 import { SyncScreen } from './ui/SyncScreen';
+import { NameGate } from './ui/NameGate';
 import { InkDefs } from './ui/charts/InkDefs';
 
 // 掃描頁 lazy chunk：偵測引擎（含 1MB wasm 載點）只在首掃進入；
@@ -90,6 +91,8 @@ export function App() {
       </nav>
       {/* key：每次開抽屜都以新 draft 重掛（EntrySheet 內部 state 以 draft 初始化） */}
       {entryOpen && <EntrySheet key={String(useAppStore.getState().entryDraft?.editingId ?? 'new')} />}
+      {/* 首啟取名卡（hydrated 且未取名時蓋全屏） */}
+      <NameGate />
       <AppToast />
     </div>
   );

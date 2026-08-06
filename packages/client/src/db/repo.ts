@@ -11,6 +11,7 @@ import {
   type Category,
   type ExpenseRecord,
   type MerchantRule,
+  type Person,
   type Syncable,
 } from '@zhangben/core';
 import { getDb } from './db';
@@ -19,16 +20,18 @@ export interface LoadedState {
   readonly records: Map<string, ExpenseRecord>;
   readonly categories: Map<string, Category>;
   readonly rules: Map<string, MerchantRule>;
+  readonly persons: Map<string, Person>;
   readonly budget: Budget | null;
 }
 
 /** 開機批次讀；首次啟動（categories 空）seed 內建八分類並落盤 */
 export async function loadAll(): Promise<LoadedState> {
   const db = await getDb();
-  const [recordRows, categoryRows, ruleRows, singletonRows] = await Promise.all([
+  const [recordRows, categoryRows, ruleRows, personRows, singletonRows] = await Promise.all([
     db.getAll('records'),
     db.getAll('categories'),
     db.getAll('rules'),
+    db.getAll('persons'),
     db.getAll('singletons'),
   ]);
 
@@ -44,6 +47,7 @@ export async function loadAll(): Promise<LoadedState> {
     records: new Map(recordRows.map((r) => [r.id, r])),
     categories,
     rules: new Map(ruleRows.map((r) => [r.id, r])),
+    persons: new Map(personRows.map((p) => [p.id, p])),
     budget: singletonRows.find((s) => s.id === 'budget') ?? null,
   };
 }
@@ -63,6 +67,11 @@ export async function putRule(row: MerchantRule): Promise<void> {
   await db.put('rules', row);
 }
 
+export async function putPerson(row: Person): Promise<void> {
+  const db = await getDb();
+  await db.put('persons', row);
+}
+
 export async function putBudget(row: Budget): Promise<void> {
   const db = await getDb();
   await db.put('singletons', row);
@@ -70,7 +79,7 @@ export async function putBudget(row: Budget): Promise<void> {
 
 /* ── 同步落盤（決策層在 sync/applyCore.ts；這裡只負責寫） ── */
 
-export type StoreName = 'records' | 'categories' | 'rules' | 'singletons';
+export type StoreName = 'records' | 'categories' | 'rules' | 'persons' | 'singletons';
 
 /**
  * 批次落盤被採納的列（單一交易；失敗=整批 abort 並 throw——呼叫端走 apply-failed
@@ -90,6 +99,9 @@ export async function persistRows<T extends Syncable>(store: StoreName, rows: re
 
 export interface PeerInfo {
   readonly peerDeviceId: string;
+  /** 對方的 Person.id：render 時優先用 persons.get(id)?.name（即時反映改名） */
+  readonly peerPersonId: string;
+  /** 名字快照（persons row 尚未同步到/被清時的 fallback） */
   readonly label: string;
   /** HLC checkpoint：下次增量同步的 changedSince 基準 */
   readonly lastSyncedAt: string;

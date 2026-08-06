@@ -6,7 +6,9 @@ import { useEffect, useMemo, useRef } from 'react';
 import { addMonths, budgetProgress, formatMonthZh, formatNTD, monthOf, type ExpenseRecord } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
 import { attachDrag } from '../gesture';
+import { matchesPersonFilter, sortPersonsForTabs } from '../personView';
 import { BudgetTotalBrush } from './charts/BudgetBrush';
+import { PersonTabs } from './PersonTabs';
 import { LEDGER, SYNC } from '../strings/ui';
 
 /** 分類印章：色彩經 color-mix 65% 壓向墨色（高彩在宣紙上才不刺眼） */
@@ -95,25 +97,29 @@ export function LedgerScreen() {
   const monthCursor = useAppStore((s) => s.monthCursor);
   const setMonth = useAppStore((s) => s.setMonth);
   const openEntry = useAppStore((s) => s.openEntry);
-  const settings = useAppStore((s) => s.settings);
+  const persons = useAppStore((s) => s.persons);
+  const personFilter = useAppStore((s) => s.personFilter);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const { groups, totals } = useMemo(() => {
+  const { groups, totals, monthTotal } = useMemo(() => {
     const byDay = new Map<string, ExpenseRecord[]>();
-    const totals: Record<'A' | 'B', number> = { A: 0, B: 0 };
+    const totals = new Map<string, number>(); // personId → 該月合計（不受頁籤過濾，供全家小計卡）
+    let monthTotal = 0;
     for (const r of records.values()) {
       if (r.deleted || monthOf(r.date) !== monthCursor) continue;
+      totals.set(r.paidBy, (totals.get(r.paidBy) ?? 0) + r.amount);
+      if (!matchesPersonFilter(r, personFilter)) continue;
       const list = byDay.get(r.date) ?? [];
       list.push(r);
       byDay.set(r.date, list);
-      totals[r.paidBy] += r.amount;
+      monthTotal += r.amount;
     }
     // 日期新在前；同日新記錄在前（uuidv7 時間有序=id 比較即可）
     const groups = [...byDay.entries()]
       .sort(([a], [b]) => (a < b ? 1 : -1))
       .map(([date, rows]) => ({ date, rows: rows.sort((a, b) => (a.id < b.id ? 1 : -1)) }));
-    return { groups, totals };
-  }, [records, monthCursor]);
+    return { groups, totals, monthTotal };
+  }, [records, monthCursor, personFilter]);
 
   // 左右滑切月（水平位移 > 60px 且橫向主導）
   useEffect(() => {
@@ -127,11 +133,13 @@ export function LedgerScreen() {
     }, 24);
   }, [setMonth]);
 
-  const monthTotal = totals.A + totals.B;
   const budgetProg = useMemo(
     () => budgetProgress(records.values(), budget, monthCursor),
     [records, budget, monthCursor],
   );
+
+  const tabPersons = sortPersonsForTabs(persons);
+  const familyView = personFilter === 'all';
 
   return (
     <div className="screen-body ledger-body" ref={listRef}>
@@ -148,16 +156,25 @@ export function LedgerScreen() {
         </button>
       </div>
 
-      <div className="person-totals">
-        {(['A', 'B'] as const).map((p) => (
-          <div key={p} className="money-card person-card" style={{ ['--card-accent' as string]: p === 'A' ? '#8a6a2f' : '#3d6b8e' }}>
-            <div className="money-name">{settings.personNames[p]}</div>
-            <div className="money-amount tnum">{formatNTD(totals[p])}</div>
-          </div>
-        ))}
-      </div>
+      <PersonTabs />
 
-      <BudgetTotalBrush progress={budgetProg} compact />
+      {/* 兩人小計卡與家庭預算只屬於【全家】檢視——個人頁籤看的是自己的帳 */}
+      {familyView && tabPersons.length >= 2 && (
+        <div className="person-totals">
+          {tabPersons.map((p, i) => (
+            <div
+              key={p.id}
+              className="money-card person-card"
+              style={{ ['--card-accent' as string]: i === 0 ? '#8a6a2f' : '#3d6b8e' }}
+            >
+              <div className="money-name">{p.name}</div>
+              <div className="money-amount tnum">{formatNTD(totals.get(p.id) ?? 0)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {familyView && <BudgetTotalBrush progress={budgetProg} compact />}
 
       <BackupNag />
 

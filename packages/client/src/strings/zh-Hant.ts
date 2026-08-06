@@ -175,14 +175,24 @@ export const BUDGET = {
   savedToast: '預算已更新',
 } as const;
 
+export const NAMECARD = {
+  title: '怎麼稱呼你？',
+  body: '這本帳是兩個人的——取個名字，同步之後對方就知道哪些是你記的。之後隨時可以在設定改。',
+  placeholder: '我',
+  start: '開始記帳',
+} as const;
+
+export const PERSONS = {
+  all: '全家',
+  /** persons row 尚未同步到時的顯示 fallback */
+  unknown: '（未同步）',
+} as const;
+
 export const SETTINGS = {
   title: '設定',
   iosInstallTitle: '安裝到主畫面',
   iosInstallBody: '用 Safari 開啟本頁 → 點「分享」→「加入主畫面」。安裝後帳本資料更不易被瀏覽器回收，開啟也更快。',
-  whoAmI: '這支手機的主人',
-  namesLabel: '兩人稱呼',
-  nameA: '甲的稱呼',
-  nameB: '乙的稱呼',
+  myNameLabel: '我的稱呼（同步後對方看到的名字）',
   categoriesLink: '分類管理',
   storageTitle: '儲存空間',
   persisted: '已向瀏覽器申請持久保存',

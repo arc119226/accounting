@@ -6,12 +6,12 @@
  * 墓碑（deleted:true）**留在 Map 裡**（merge/同步需要），UI 一律自行過濾。
  */
 import type { StateCreator } from 'zustand';
-import type { Budget, Category, ExpenseRecord, MerchantRule, ParsedInvoice, PersonId } from '@zhangben/core';
+import type { Budget, Category, ExpenseRecord, MerchantRule, ParsedInvoice, Person } from '@zhangben/core';
 import { monthOf } from '@zhangben/core';
 import type { AppStore } from './appStore';
 import * as repo from '../db/repo';
 import { tickClock } from '../clock';
-import { getDeviceId, uuidv7 } from '../ids';
+import { getDeviceId, getPersonId, uuidv7 } from '../ids';
 import { logError } from '../errlog';
 import { show } from '../notice';
 
@@ -23,7 +23,8 @@ export interface EntryDraft {
   readonly categoryId: string;
   readonly note: string;
   readonly merchantName: string;
-  readonly paidBy: PersonId;
+  /** Person.id（v2） */
+  readonly paidBy: string;
 }
 
 export interface EntryValues {
@@ -32,7 +33,7 @@ export interface EntryValues {
   readonly categoryId: string;
   readonly note: string;
   readonly merchantName: string;
-  readonly paidBy: PersonId;
+  readonly paidBy: string;
 }
 
 export interface LedgerSlice {
@@ -40,10 +41,13 @@ export interface LedgerSlice {
   records: Map<string, ExpenseRecord>;
   categories: Map<string, Category>;
   rules: Map<string, MerchantRule>;
+  persons: Map<string, Person>;
   budget: Budget | null;
   monthCursor: string;
   entryDraft: EntryDraft | null;
   hydrate(): Promise<void>;
+  /** 改「自己的」名字（唯一的人物編輯入口；別人的 row 沒有任何寫路徑） */
+  renameMyPerson(name: string): void;
   setMonth(month: string): void;
   openEntry(init?: Partial<EntryDraft>): void;
   closeEntry(): void;
@@ -64,7 +68,7 @@ export interface LedgerSlice {
     readonly categoryId: string;
     readonly note: string;
     readonly merchantName: string;
-    readonly paidBy: PersonId;
+    readonly paidBy: string;
   }): void;
   upsertRule(sellerTaxId: string, categoryId: string, displayName: string): void;
   deleteRule(id: string): void;
@@ -101,6 +105,7 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
   records: new Map(),
   categories: new Map(),
   rules: new Map(),
+  persons: new Map(),
   budget: null,
   monthCursor: monthOf(todayISO()),
   entryDraft: null,
@@ -108,11 +113,27 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
   async hydrate() {
     try {
       const loaded = await repo.loadAll();
+      // 確保「我」的 Person row 存在（首啟/清空後）：預設名「我」，取名卡/設定頁改
+      let persons = loaded.persons;
+      const myId = getPersonId();
+      if (!persons.has(myId)) {
+        const me: Person = {
+          id: myId,
+          updatedAt: tickClock(),
+          deviceId: getDeviceId(),
+          deleted: false,
+          name: '我',
+        };
+        persons = new Map(persons);
+        persons.set(myId, me);
+        persist(repo.putPerson(me), 'putPerson(seed)');
+      }
       set({
         hydrated: true,
         records: loaded.records,
         categories: loaded.categories,
         rules: loaded.rules,
+        persons,
         budget: loaded.budget,
       });
       // 種回時鐘（審查修正）：localStorage 的 HLC 可能寫失敗（隱私模式/配額滿），
@@ -139,6 +160,25 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
     }
   },
 
+  renameMyPerson(name) {
+    const s = get();
+    const myId = getPersonId();
+    const existing = s.persons.get(myId);
+    const clean = name.trim().slice(0, 8);
+    if (!clean || clean === existing?.name) return;
+    const row: Person = {
+      id: myId,
+      updatedAt: tickClock(),
+      deviceId: getDeviceId(),
+      deleted: false,
+      name: clean,
+    };
+    const persons = new Map(s.persons);
+    persons.set(myId, row);
+    set({ persons });
+    persist(repo.putPerson(row), 'putPerson');
+  },
+
   setMonth(month) {
     set({ monthCursor: month });
   },
@@ -156,7 +196,7 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
         categoryId: firstCat?.id ?? 'cat-misc',
         note: '',
         merchantName: '',
-        paidBy: s.settings.myPerson,
+        paidBy: getPersonId(),
         ...init,
       },
     });

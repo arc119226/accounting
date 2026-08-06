@@ -6,8 +6,6 @@
  * `updatedAt` 是 HLC 編碼字串（hlc.ts；定寬 → 字典序即全序），不是牆鐘。
  */
 
-export type PersonId = 'A' | 'B';
-
 /** 每一筆可同步資料的共同信封（merge.ts 只認得這個介面） */
 export interface Syncable {
   /** record=uuidv7（client/ids.ts 產）；category=固定字串；rule=賣方統編；budget='budget' */
@@ -18,6 +16,16 @@ export interface Syncable {
   readonly deviceId: string;
   /** 墓碑：刪除=標記不物理刪，否則另一台會把它復活 */
   readonly deleted: boolean;
+}
+
+/**
+ * 人物（v2）：各記各的帳、自己取自己的名字。
+ * id=uuidv7（每個安裝首啟 mint，存 localStorage `zb.personId`）——**不是槽位**，
+ * 同步以 uuid 為鍵合併；name 是同步的唯一真相（不住 Settings）。
+ * 只有本人會編輯自己的 row（UI 限制），LWW 天然無衝突；改名經同步傳播。
+ */
+export interface Person extends Syncable {
+  readonly name: string;
 }
 
 /** 發票品項（掃描盡力保留；常缺/不全，見 einvoice.ts itemsComplete） */
@@ -36,7 +44,8 @@ export interface ExpenseRecord extends Syncable {
   readonly date: string;
   readonly categoryId: string;
   readonly note: string;
-  readonly paidBy: PersonId;
+  /** 誰花的：Person.id（uuid）。人物 row 可能晚到（同步中途），顯示層要有 fallback。 */
+  readonly paidBy: string;
   /** 來源不因傳輸而變（掃描的記錄同步到對方手機仍是 einvoice）——合併冪等的前提 */
   readonly source: 'manual' | 'einvoice';
   readonly merchant?: {

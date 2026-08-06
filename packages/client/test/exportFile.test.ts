@@ -42,12 +42,15 @@ describe('exportFile', () => {
     await resetDb();
   });
 
-  it('buildExport → JSON 往返 → parseImport 得回等價信封', () => {
+  it('buildExport → JSON 往返 → parseImport 得回等價信封（v2 含 persons）', () => {
     const env = buildExport({
       deviceId: 'aaa',
       records: [rec('r1', '000000000000005-0000-aaa', 100)],
       categories: seedCategories().values(),
       rules: [],
+      persons: [
+        { id: 'p-me', updatedAt: '000000000000005-0000-aaa', deviceId: 'aaa', deleted: false, name: '我' },
+      ],
       budget: null,
     });
     const parsed = parseImport(JSON.stringify(env));
@@ -55,14 +58,21 @@ describe('exportFile', () => {
     if (parsed.ok) {
       expect(parsed.env.records).toHaveLength(1);
       expect(parsed.env.categories).toHaveLength(8);
+      expect(parsed.env.persons).toHaveLength(1);
     }
+  });
+
+  it('v1 舊信封（無 persons、v:1）被拒收', () => {
+    expect(
+      parseImport(JSON.stringify({ v: 1, app: 'zhangben', records: [], categories: [], rules: [], budget: null })).ok,
+    ).toBe(false);
   });
 
   it('parseImport 拒絕垃圾/缺信封欄位/錯 app 標記/毒列', () => {
     expect(parseImport('not json').ok).toBe(false);
     expect(parseImport('{}').ok).toBe(false);
-    expect(parseImport(JSON.stringify({ v: 1, app: 'other', records: [], categories: [], rules: [], budget: null })).ok).toBe(false);
-    const base = { v: 1, app: 'zhangben', categories: [], rules: [], budget: null };
+    expect(parseImport(JSON.stringify({ v: 2, app: 'other', records: [], categories: [], rules: [], persons: [], budget: null })).ok).toBe(false);
+    const base = { v: 2, app: 'zhangben', categories: [], rules: [], persons: [], budget: null };
     // 信封不完整
     expect(parseImport(JSON.stringify({ ...base, records: [{ id: 'x' }] })).ok).toBe(false);
     // 信封合格但缺 date（毒列：起始畫面按日分組會炸）
@@ -139,7 +149,7 @@ describe('exportFile', () => {
 
   it('lowerPeerCheckpoints：合入舊列時把水位回撥到嚴格小於 minTaken', async () => {
     await repo.loadAll();
-    await repo.savePeer({ peerDeviceId: 'ppp', label: '乙', lastSyncedAt: '000000000000008-0000-ppp', lastSyncWallMs: 1 });
+    await repo.savePeer({ peerDeviceId: 'ppp', peerPersonId: 'person-ppp', label: '乙', lastSyncedAt: '000000000000008-0000-ppp', lastSyncWallMs: 1 });
     const peers = await repo.lowerPeerCheckpoints('000000000000005-0000-old');
     expect(peers[0]!.lastSyncedAt < '000000000000005-0000-old').toBe(true);
     // 水位已低於 minTaken 的 peer 不動

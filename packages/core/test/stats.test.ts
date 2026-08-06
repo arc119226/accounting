@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { DateRange } from '../src/rocdate';
 import { addMonths, daysInMonth } from '../src/rocdate';
-import type { ExpenseRecord, PersonId } from '../src/types';
+import type { ExpenseRecord } from '../src/types';
 import { dailyTrend, sumByCategory, sumByMonth, sumByPerson } from '../src/stats';
 import type { CategoryTotal, DayPoint, MonthTotal } from '../src/stats';
 
@@ -50,7 +50,8 @@ const recordArb: fc.Arbitrary<ExpenseRecord> = fc.record({
   date: dateArb,
   categoryId: fc.constantFrom(...CATEGORY_POOL),
   note: fc.constant(''),
-  paidBy: fc.constantFrom<PersonId>('A', 'B'),
+  // v2：paidBy 是 Person.id（uuid）——小池子逼出同人多筆聚合
+  paidBy: fc.constantFrom('p-alice', 'p-bob', 'p-caro'),
   source: fc.constantFrom('manual', 'einvoice') as fc.Arbitrary<'manual' | 'einvoice'>,
 });
 
@@ -66,7 +67,7 @@ function mk(over: {
   readonly date: string;
   readonly amount?: number;
   readonly categoryId?: string;
-  readonly paidBy?: PersonId;
+  readonly paidBy?: string;
   readonly deleted?: boolean;
 }): ExpenseRecord {
   return {
@@ -124,16 +125,17 @@ function refSumByCategory(recs: readonly ExpenseRecord[], range: DateRange): Cat
   return rows;
 }
 
-/** A/B 各自 filter+reduce */
-function refSumByPerson(
-  recs: readonly ExpenseRecord[],
-  range: DateRange,
-): Readonly<Record<PersonId, number>> {
-  const sumOf = (p: PersonId): number =>
-    recs
-      .filter((r) => !r.deleted && r.paidBy === p && range.from <= r.date && r.date <= range.to)
-      .reduce((s, r) => s + r.amount, 0);
-  return { A: sumOf('A'), B: sumOf('B') };
+/** 逐人重算：先收集出現過的人，再各自 filter+reduce（不共用 src 的單趟掃描） */
+function refSumByPerson(recs: readonly ExpenseRecord[], range: DateRange): Map<string, number> {
+  const live = recs.filter((r) => !r.deleted && range.from <= r.date && r.date <= range.to);
+  const out = new Map<string, number>();
+  for (const p of new Set(live.map((r) => r.paidBy))) {
+    out.set(
+      p,
+      live.filter((r) => r.paidBy === p).reduce((s, r) => s + r.amount, 0),
+    );
+  }
+  return out;
 }
 
 /** 逐日重算：每天各跑一次 filter+reduce（日期全等比對），cumulative 逐日累加 */
@@ -272,27 +274,27 @@ describe('sumByCategory', () => {
 // ---------- sumByPerson ----------
 
 describe('sumByPerson', () => {
-  it('任意記錄集與暴力法對照', () => {
+  it('任意記錄集與暴力法對照（Map 深等）', () => {
     fc.assert(
       fc.property(recsArb, rangeArb, (recs, range) => {
-        expect(sumByPerson(recs, range)).toEqual(refSumByPerson(recs, range));
+        expect(new Map(sumByPerson(recs, range))).toEqual(refSumByPerson(recs, range));
       }),
     );
   });
 
-  it('A/B 都必有鍵：空輸入回 {A:0, B:0}', () => {
-    expect(sumByPerson([], { from: '2026-08-01', to: '2026-08-31' })).toEqual({ A: 0, B: 0 });
+  it('空輸入回空 Map（人物清單由呼叫端補齊，core 不生零列）', () => {
+    expect(sumByPerson([], { from: '2026-08-01', to: '2026-08-31' }).size).toBe(0);
   });
 
   it('range 端點含入、墓碑排除', () => {
     const range: DateRange = { from: '2026-08-01', to: '2026-08-31' };
     const recs = [
-      mk({ date: '2026-08-01', paidBy: 'A', amount: 10 }),
-      mk({ date: '2026-08-31', paidBy: 'B', amount: 20 }),
-      mk({ date: '2026-08-15', paidBy: 'B', amount: 999, deleted: true }),
-      mk({ date: '2026-09-01', paidBy: 'A', amount: 999 }), // 區間外
+      mk({ date: '2026-08-01', paidBy: 'p-alice', amount: 10 }),
+      mk({ date: '2026-08-31', paidBy: 'p-bob', amount: 20 }),
+      mk({ date: '2026-08-15', paidBy: 'p-bob', amount: 999, deleted: true }),
+      mk({ date: '2026-09-01', paidBy: 'p-alice', amount: 999 }), // 區間外
     ];
-    expect(sumByPerson(recs, range)).toEqual({ A: 10, B: 20 });
+    expect(new Map(sumByPerson(recs, range))).toEqual(new Map([['p-alice', 10], ['p-bob', 20]]));
   });
 });
 

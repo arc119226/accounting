@@ -21,12 +21,14 @@ import {
 } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
 import { todayISO } from '../store/ledgerSlice';
+import { matchesPersonFilter, sortPersonsForTabs } from '../personView';
 import { BarChart } from './charts/BarChart';
 import { DonutChart } from './charts/DonutChart';
 import { LineChart } from './charts/LineChart';
 import { PersonSplit } from './charts/PersonSplit';
 import { BudgetCategoryList, BudgetTotalBrush } from './charts/BudgetBrush';
 import { CategorySeal } from './LedgerScreen';
+import { PersonTabs } from './PersonTabs';
 import { LEDGER, STATS } from '../strings/ui';
 
 type Preset = 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom';
@@ -45,7 +47,8 @@ export function StatsScreen() {
   const records = useAppStore((s) => s.records);
   const categories = useAppStore((s) => s.categories);
   const budget = useAppStore((s) => s.budget);
-  const settings = useAppStore((s) => s.settings);
+  const persons = useAppStore((s) => s.persons);
+  const personFilter = useAppStore((s) => s.personFilter);
   const setMonth = useAppStore((s) => s.setMonth);
   const setScreen = useAppStore((s) => s.setScreen);
   const openEntry = useAppStore((s) => s.openEntry);
@@ -68,13 +71,24 @@ export function StatsScreen() {
   const focusMonth = monthOf(range.to);
   const singleMonth = monthOf(range.from) === focusMonth;
 
-  const rows = useMemo(() => [...records.values()], [records]);
+  const familyView = personFilter === 'all';
+  const allRows = useMemo(() => [...records.values()], [records]);
+  /** 頁籤過濾後的資料集：四張圖都跟著（全家=不過濾） */
+  const rows = useMemo(
+    () => allRows.filter((r) => matchesPersonFilter(r, personFilter)),
+    [allRows, personFilter],
+  );
   const byMonth = useMemo(() => sumByMonth(rows, 12, focusMonth), [rows, focusMonth]);
   const byCat = useMemo(() => sumByCategory(rows, range), [rows, range]);
   const byPerson = useMemo(() => sumByPerson(rows, range), [rows, range]);
   const trend = useMemo(() => dailyTrend(rows, focusMonth), [rows, focusMonth]);
   const trendPrev = useMemo(() => dailyTrend(rows, addMonths(focusMonth, -1)), [rows, focusMonth]);
-  const budgetProg = useMemo(() => budgetProgress(rows, budget, focusMonth), [rows, budget, focusMonth]);
+  // 預算是家庭層級：一律以未過濾資料計（個人頁籤本就不顯示預算卡）
+  const budgetProg = useMemo(() => budgetProgress(allRows, budget, focusMonth), [allRows, budget, focusMonth]);
+  const splitPersons = useMemo(
+    () => sortPersonsForTabs(persons).map((p) => ({ id: p.id, name: p.name, total: byPerson.get(p.id) ?? 0 })),
+    [persons, byPerson],
+  );
 
   const rangeTotal = byCat.reduce((s, c) => s + c.total, 0);
   const colorMap = useMemo(
@@ -91,6 +105,7 @@ export function StatsScreen() {
 
   return (
     <div className="screen-body">
+      <PersonTabs />
       <div className="seg">
         {(['thisMonth', 'lastMonth', 'thisYear', 'custom'] as const).map((p) => (
           <button key={p} className={`seg-btn${preset === p ? ' active' : ''}`} onClick={() => setPreset(p)}>
@@ -123,7 +138,7 @@ export function StatsScreen() {
             />
           </div>
 
-          {singleMonth && budgetProg.total.limit > 0 && (
+          {familyView && singleMonth && budgetProg.total.limit > 0 && (
             <div className="paper-card">
               <div className="chart-title">
                 {STATS.budgetTitle} · {formatMonthZh(focusMonth)}
@@ -201,10 +216,12 @@ export function StatsScreen() {
             <LineChart current={trend} previous={trendPrev} />
           </div>
 
-          <div className="paper-card">
-            <div className="chart-title">{STATS.personTitle}</div>
-            <PersonSplit totals={byPerson} names={settings.personNames} />
-          </div>
+          {familyView && splitPersons.length >= 2 && (
+            <div className="paper-card">
+              <div className="chart-title">{STATS.personTitle}</div>
+              <PersonSplit persons={splitPersons} />
+            </div>
+          )}
         </>
       )}
     </div>

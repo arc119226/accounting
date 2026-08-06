@@ -2,16 +2,18 @@
  * 檔案備份（同步的保底路徑）：匯出完整帳本 JSON、匯入走**同一個**
  * repo.applyIncoming 合併路徑——全 app 只有一份合併實作，匯入=很慢的同步。
  */
-import { isValidISODate, type Budget, type Category, type ExpenseRecord, type MerchantRule } from '@zhangben/core';
+import { isValidISODate, type Budget, type Category, type ExpenseRecord, type MerchantRule, type Person } from '@zhangben/core';
 
 export interface ExportEnvelope {
-  readonly v: 1;
+  /** v2：人物 UUID 化（paidBy=Person.id、含 persons 陣列）。v1 備份不再接受（資料清空重來）。 */
+  readonly v: 2;
   readonly app: 'zhangben';
   readonly exportedAt: string;
   readonly deviceId: string;
   readonly records: readonly ExpenseRecord[];
   readonly categories: readonly Category[];
   readonly rules: readonly MerchantRule[];
+  readonly persons: readonly Person[];
   readonly budget: Budget | null;
 }
 
@@ -20,16 +22,18 @@ export function buildExport(input: {
   records: Iterable<ExpenseRecord>;
   categories: Iterable<Category>;
   rules: Iterable<MerchantRule>;
+  persons: Iterable<Person>;
   budget: Budget | null;
 }): ExportEnvelope {
   return {
-    v: 1,
+    v: 2,
     app: 'zhangben',
     exportedAt: new Date().toISOString(),
     deviceId: input.deviceId,
     records: [...input.records],
     categories: [...input.categories],
     rules: [...input.rules],
+    persons: [...input.persons],
     budget: input.budget,
   };
 }
@@ -75,7 +79,8 @@ function recordOk(r: unknown): boolean {
     isValidISODate(r['date']) &&
     typeof r['categoryId'] === 'string' &&
     typeof r['note'] === 'string' &&
-    (r['paidBy'] === 'A' || r['paidBy'] === 'B') &&
+    typeof r['paidBy'] === 'string' &&
+    r['paidBy'] !== '' &&
     (r['source'] === 'manual' || r['source'] === 'einvoice') &&
     (inv === undefined ||
       (typeof inv === 'object' && inv !== null &&
@@ -99,6 +104,10 @@ function ruleOk(r: unknown): boolean {
   return envelopeOk(r) && typeof r['categoryId'] === 'string' && typeof r['displayName'] === 'string';
 }
 
+function personOk(r: unknown): boolean {
+  return envelopeOk(r) && typeof r['name'] === 'string' && r['name'] !== '';
+}
+
 function budgetOk(r: unknown): boolean {
   return (
     envelopeOk(r) &&
@@ -113,13 +122,19 @@ export function parseImport(text: string): { ok: true; env: ExportEnvelope } | {
     const raw: unknown = JSON.parse(text);
     if (typeof raw !== 'object' || raw === null) return { ok: false };
     const o = raw as Record<string, unknown>;
-    if (o['v'] !== 1 || o['app'] !== 'zhangben') return { ok: false };
-    if (!Array.isArray(o['records']) || !Array.isArray(o['categories']) || !Array.isArray(o['rules'])) {
+    if (o['v'] !== 2 || o['app'] !== 'zhangben') return { ok: false };
+    if (
+      !Array.isArray(o['records']) ||
+      !Array.isArray(o['categories']) ||
+      !Array.isArray(o['rules']) ||
+      !Array.isArray(o['persons'])
+    ) {
       return { ok: false };
     }
     if (!(o['records'] as unknown[]).every(recordOk)) return { ok: false };
     if (!(o['categories'] as unknown[]).every(categoryOk)) return { ok: false };
     if (!(o['rules'] as unknown[]).every(ruleOk)) return { ok: false };
+    if (!(o['persons'] as unknown[]).every(personOk)) return { ok: false };
     const budget = o['budget'];
     if (budget !== null && !budgetOk(budget)) return { ok: false };
     return { ok: true, env: raw as ExportEnvelope };

@@ -19,6 +19,9 @@
 
 - **金額 = 整數新台幣元**；所有金額欄位 `font-variant-numeric: tabular-nums`
 - **每筆可同步資料都帶 Syncable 信封** `{id, updatedAt(HLC 字串), deviceId, deleted}`；刪除=墓碑，不物理刪
+- **人物是 UUID 實體（v2）**：`Person {id: uuidv7, name}` 走同步；paidBy=Person.id；
+  名字**只有本人編輯**（renameMyPerson 是唯一寫入口），不存在改對方名字的路徑；
+  「我是誰」= ids.getPersonId()（localStorage `zb.personId`）
 - styles.css 是純 @import barrel，**順序即契約**（test/styles.test.ts 鎖順序 + 檢查 CSS url() 資產存在）
 - 每個畫面資產都要有回退（圖 → 漸層 → 純色，一行 background 疊層）
 - 註解寫「為什麼」，繁體中文；禁：霓虹色、科技感漸層、glassmorphism、emoji 濫用、簡體字

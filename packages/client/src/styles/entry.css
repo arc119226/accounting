@@ -142,6 +142,18 @@
 
 .rule-select { max-width: 140px; flex: 0 0 auto; }
 
+/* 人物頁籤（帳本/統計共用）：seg 樣式沿用，只收窄與置中 */
+.person-tabs { flex: 0 0 auto; align-self: center; min-width: min(100%, 360px); }
+
+/* 取名卡：輸入置中放大（第一印象要像落款不是表單） */
+.name-gate .name-input {
+  text-align: center;
+  font-size: 20px;
+  font-family: var(--font-brush);
+  letter-spacing: 0.2em;
+  margin-bottom: 4px;
+}
+
 /* 設定頁零碎 */
 .storage-line { line-height: 1.7; }
 .version-line { font-size: 12px; }

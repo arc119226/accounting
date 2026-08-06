@@ -1,9 +1,10 @@
 /**
- * 設定：我是誰 / 兩人稱呼 / 每月預算 / 分類管理入口 / 儲存空間狀態 / 診斷 / 版本。
+ * 設定：我的稱呼 / 每月預算 / 分類管理入口 / 儲存空間狀態 / 診斷 / 版本。
  */
 import { useEffect, useState } from 'react';
 import { parseAmountInput, sortCategories } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
+import { getPersonId } from '../ids';
 import { getStorageInfo, type StorageInfo } from '../db/persist';
 import { readErrLog } from '../errlog';
 import { APP_VERSION } from '../version';
@@ -76,10 +77,20 @@ function DevSeedButton() {
         void (async () => {
           const repo = await import('../db/repo');
           const { tickClock } = await import('../clock');
-          const { getDeviceId, uuidv7 } = await import('../ids');
+          const { getDeviceId, getPersonId: myPid, uuidv7 } = await import('../ids');
           const cats = ['cat-food', 'cat-transport', 'cat-home', 'cat-fun', 'cat-med', 'cat-misc'];
           const notes = ['早餐', '午餐', '晚餐', '捷運', '加油', '日用品', '電影', '藥局', ''];
           const now = new Date();
+          // 示範第二人：驗證【全家/每人】頁籤與拔河圖用
+          const demoPersonId = 'demo-person-0001';
+          await repo.putPerson({
+            id: demoPersonId,
+            updatedAt: tickClock(),
+            deviceId: getDeviceId(),
+            deleted: false,
+            name: '示範',
+          });
+          const people = [myPid(), demoPersonId];
           for (let m = 0; m < 3; m++) {
             const y = now.getFullYear();
             const mo = now.getMonth() - m;
@@ -98,7 +109,7 @@ function DevSeedButton() {
                 date,
                 categoryId: cats[Math.floor(Math.random() * cats.length)]!,
                 note: notes[Math.floor(Math.random() * notes.length)]!,
-                paidBy: Math.random() < 0.55 ? 'A' : 'B',
+                paidBy: people[Math.random() < 0.55 ? 0 : 1]!,
                 source: 'manual',
               });
             }
@@ -134,9 +145,30 @@ function IosInstallHint() {
   );
 }
 
+/** 我的稱呼：本地打字、失焦/Enter 才 commit（每鍵 commit 會灌爆 HLC 與同步噪音） */
+function MyNameCard() {
+  const persons = useAppStore((s) => s.persons);
+  const renameMyPerson = useAppStore((s) => s.renameMyPerson);
+  const current = persons.get(getPersonId())?.name ?? '我';
+  const [draft, setDraft] = useState(current);
+  return (
+    <div className="paper-card">
+      <label className="field-label">{SETTINGS.myNameLabel}</label>
+      <input
+        className="text-input"
+        value={draft}
+        maxLength={8}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => renameMyPerson(draft || current)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+      />
+    </div>
+  );
+}
+
 export function SettingsScreen() {
-  const settings = useAppStore((s) => s.settings);
-  const updateSettings = useAppStore((s) => s.updateSettings);
   const setScreen = useAppStore((s) => s.setScreen);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [copied, setCopied] = useState(false);
@@ -147,34 +179,7 @@ export function SettingsScreen() {
 
   return (
     <div className="screen-body">
-      <div className="paper-card">
-        <label className="field-label">{SETTINGS.whoAmI}</label>
-        <div className="seg">
-          {(['A', 'B'] as const).map((p) => (
-            <button
-              key={p}
-              className={`seg-btn${settings.myPerson === p ? ' active' : ''}`}
-              onClick={() => updateSettings({ myPerson: p })}
-            >
-              {settings.personNames[p]}
-            </button>
-          ))}
-        </div>
-
-        <label className="field-label">{SETTINGS.namesLabel}</label>
-        {(['A', 'B'] as const).map((p) => (
-          <input
-            key={p}
-            className="text-input"
-            value={settings.personNames[p]}
-            aria-label={p === 'A' ? SETTINGS.nameA : SETTINGS.nameB}
-            maxLength={8}
-            onChange={(e) =>
-              updateSettings({ personNames: { ...settings.personNames, [p]: e.target.value } })
-            }
-          />
-        ))}
-      </div>
+      <MyNameCard />
 
       <BudgetCard />
 

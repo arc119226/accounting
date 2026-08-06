@@ -8,15 +8,17 @@
  *   → 雙向 done+ack 齊 → save-checkpoint（= min(雙方 hello 時刻 HLC)，兩側算出同值）→ bye → leave
  * checkpoint 取 hello 時刻而非完成時刻：同步窗內的並發寫留給下次重送，合併冪等使重送零成本。
  */
-import type { MergeSummary, PersonId, Syncable } from '@zhangben/core';
+import type { MergeSummary, Syncable } from '@zhangben/core';
 
-export type SyncKind = 'records' | 'categories' | 'rules' | 'budget';
-export const SYNC_KINDS: readonly SyncKind[] = ['records', 'categories', 'rules', 'budget'];
+export type SyncKind = 'persons' | 'records' | 'categories' | 'rules' | 'budget';
+/** persons 排最前：對方記錄先到而人物 row 未到時 UI 只能顯示 fallback，先送人減少這個窗口 */
+export const SYNC_KINDS: readonly SyncKind[] = ['persons', 'records', 'categories', 'rules', 'budget'];
 
 export interface PeerHello {
   readonly deviceId: string;
-  readonly person: PersonId;
-  readonly personNames: Readonly<Record<PersonId, string>>;
+  /** v2：對方的 Person.id（uuid）。名字走 persons 同步實體，hello 只帶快照當 label fallback。 */
+  readonly personId: string;
+  readonly personName: string;
   /** hello 時刻的 HLC（checkpoint 計算與時鐘吸收用） */
   readonly hlcNow: string;
   /** 物理牆鐘 ms：UI 比對兩機時鐘差 >10 分鐘出警示 */

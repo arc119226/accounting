@@ -18,9 +18,10 @@ import {
   parseAmountInput,
   type ExpenseRecord,
   type ParsedInvoice,
-  type PersonId,
 } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
+import { getPersonId } from '../ids';
+import { sortPersonsForTabs } from '../personView';
 import { todayISO } from '../store/ledgerSlice';
 import { getDetector } from '../scan/detector';
 import { acquireCamera } from '../scan/camera';
@@ -37,7 +38,7 @@ type Result =
 function PreviewCard({ inv, onDone, onRescan }: { inv: ParsedInvoice; onDone: () => void; onRescan: () => void }) {
   const categories = useAppStore((s) => s.categories);
   const rules = useAppStore((s) => s.rules);
-  const settings = useAppStore((s) => s.settings);
+  const persons = useAppStore((s) => s.persons);
   const saveScanned = useAppStore((s) => s.saveScanned);
 
   const rule = suggestCategory(rules, inv.sellerTaxId);
@@ -46,7 +47,7 @@ function PreviewCard({ inv, onDone, onRescan }: { inv: ParsedInvoice; onDone: ()
   const [merchantName, setMerchantName] = useState(rule?.displayName ?? '');
   const [categoryId, setCategoryId] = useState(rule?.categoryId ?? 'cat-misc');
   const [note, setNote] = useState('');
-  const [paidBy, setPaidBy] = useState<PersonId>(settings.myPerson);
+  const [paidBy, setPaidBy] = useState<string>(getPersonId());
 
   const cats = sortCategories(categories.values());
   const amount = parseAmountInput(amountStr);
@@ -83,9 +84,9 @@ function PreviewCard({ inv, onDone, onRescan }: { inv: ParsedInvoice; onDone: ()
 
       <label className="field-label">{ENTRY.paidByLabel}</label>
       <div className="seg">
-        {(['A', 'B'] as const).map((p) => (
-          <button key={p} className={`seg-btn${paidBy === p ? ' active' : ''}`} onClick={() => setPaidBy(p)}>
-            {settings.personNames[p]}
+        {sortPersonsForTabs(persons).map((p) => (
+          <button key={p.id} className={`seg-btn${paidBy === p.id ? ' active' : ''}`} onClick={() => setPaidBy(p.id)}>
+            {p.name}
           </button>
         ))}
       </div>

@@ -15,7 +15,7 @@
 
 import { addMonths, daysInMonth, monthOf } from './rocdate';
 import type { DateRange } from './rocdate';
-import type { ExpenseRecord, PersonId } from './types';
+import type { ExpenseRecord } from './types';
 
 /** 閉區間內（from <= date <= to，字串比較）；端點皆含（DateRange 契約） */
 function inRange(date: string, range: DateRange): boolean {
@@ -99,21 +99,20 @@ export function sumByCategory(
 }
 
 /**
- * range 閉區間內 A/B 各自的付款合計。A/B 都必有鍵（無記錄=0）——
- * 分帳畫面直接取值不必判 undefined，也符合 PersonId 是封閉聯集的事實。
+ * range 閉區間內按人（Person.id）的付款合計。
+ * v2：人物是開放集合（uuid），回 Map（personId → total）——只含出現過的人；
+ * 「人物清單、含零額者」由呼叫端拿 persons store 自行補齊（core 收不到人物清單）。
  */
 export function sumByPerson(
   recs: Iterable<ExpenseRecord>,
   range: DateRange,
-): Readonly<Record<PersonId, number>> {
-  let a = 0;
-  let b = 0;
+): ReadonlyMap<string, number> {
+  const buckets = new Map<string, number>();
   for (const r of recs) {
     if (r.deleted || !inRange(r.date, range)) continue;
-    if (r.paidBy === 'A') a += r.amount;
-    else b += r.amount;
+    buckets.set(r.paidBy, (buckets.get(r.paidBy) ?? 0) + r.amount);
   }
-  return { A: a, B: b };
+  return buckets;
 }
 
 export interface DayPoint {

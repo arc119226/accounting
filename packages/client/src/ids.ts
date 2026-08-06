@@ -53,3 +53,33 @@ export function getDeviceId(): string {
   }
   return id;
 }
+
+const PERSON_KEY = 'zb.personId';
+
+let cachedPersonId: string | null = null;
+
+/**
+ * 人物 id（v2）：這個安裝代表的「人」。首啟 mint uuidv7、永不變；
+ * 與 deviceId 分開——device 管 HLC/同步，person 管「誰花的」與顯示名。
+ * 名字本身住 Person row（同步實體），不在這裡。
+ */
+export function getPersonId(): string {
+  if (cachedPersonId) return cachedPersonId;
+  try {
+    const existing = localStorage.getItem(PERSON_KEY);
+    if (existing && existing.length >= 8) {
+      cachedPersonId = existing;
+      return existing;
+    }
+  } catch {
+    /* 讀不到就往下鑄造 */
+  }
+  const id = uuidv7();
+  cachedPersonId = id;
+  try {
+    localStorage.setItem(PERSON_KEY, id);
+  } catch {
+    /* 無痕模式：session 內用暫時 id */
+  }
+  return id;
+}

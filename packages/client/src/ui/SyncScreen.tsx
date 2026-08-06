@@ -42,6 +42,7 @@ export function SyncScreen() {
   const roomCode = useAppStore((s) => s.roomCode);
   const clockDriftMs = useAppStore((s) => s.clockDriftMs);
   const peers = useAppStore((s) => s.peers);
+  const persons = useAppStore((s) => s.persons);
   const importSummary = useAppStore((s) => s.importSummary);
   const importFailed = useAppStore((s) => s.importFailed);
   const hostSync = useAppStore((s) => s.hostSync);
@@ -144,13 +145,13 @@ export function SyncScreen() {
         {session?.phase === 'done' && <SummaryCard totals={session.totals} onClose={cancelSync} />}
       </div>
 
-      {/* peers */}
+      {/* peers：名字優先取 persons row（即時反映對方改名），label 只是快照 fallback */}
       {peers.length > 0 && (
         <div className="paper-card">
           <div className="field-label">{SYNC.peersTitle}</div>
           {peers.map((p) => (
             <div key={p.peerDeviceId} className="cat-row">
-              <span className="cat-name">{p.label}</span>
+              <span className="cat-name">{persons.get(p.peerPersonId)?.name ?? p.label}</span>
               <span className="dim-text">
                 {SYNC.lastSync}
                 {p.lastSyncWallMs > 0 ? relativeTime(p.lastSyncWallMs) : SYNC.never}

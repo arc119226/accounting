@@ -8,7 +8,7 @@ export type {
   ExpenseRecord,
   InvoiceItem,
   MerchantRule,
-  PersonId,
+  Person,
   Syncable,
 } from './types';
 export {

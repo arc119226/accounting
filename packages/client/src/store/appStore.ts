@@ -13,6 +13,9 @@ export type Screen = 'ledger' | 'scan' | 'stats' | 'sync' | 'settings' | 'catego
 export interface ShellSlice {
   screen: Screen;
   setScreen(screen: Screen): void;
+  /** 人物檢視頁籤（Ledger 與 Stats 共用）：'all'=全家、否則為 Person.id */
+  personFilter: 'all' | string;
+  setPersonFilter(filter: 'all' | string): void;
 }
 
 export type AppStore = ShellSlice & LedgerSlice & SettingsSlice & SyncSlice;
@@ -20,6 +23,8 @@ export type AppStore = ShellSlice & LedgerSlice & SettingsSlice & SyncSlice;
 export const useAppStore = create<AppStore>()((set, get, store) => ({
   screen: 'ledger',
   setScreen: (screen) => set({ screen }),
+  personFilter: 'all',
+  setPersonFilter: (personFilter) => set({ personFilter }),
   ...createLedgerSlice(set, get, store),
   ...createSettingsSlice(set, get, store),
   ...createSyncSlice(set, get, store),

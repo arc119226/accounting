@@ -11,7 +11,7 @@ import type { Budget, Syncable } from '@zhangben/core';
 import type { AppStore } from './appStore';
 import * as repo from '../db/repo';
 import { recvClock, tickClock } from '../clock';
-import { getDeviceId } from '../ids';
+import { getDeviceId, getPersonId } from '../ids';
 import { decideIncoming, type ApplyDecision } from '../sync/applyCore';
 import type { SyncHandle } from '../sync/trystero';
 import type { PeerHello, SyncKind, SyncSession, SyncTotals } from '../sync/protocol';
@@ -68,6 +68,12 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
         out = d as ApplyDecision<Syncable>;
         return { rules: new Map(d.next) };
       });
+    } else if (kind === 'persons') {
+      set((cur) => {
+        const d = decideIncoming(cur.persons, rows as never, null);
+        out = d as ApplyDecision<Syncable>;
+        return { persons: new Map(d.next) };
+      });
     } else {
       set((cur) => {
         const local = new Map<string, Budget>(cur.budget ? [['budget', cur.budget]] : []);
@@ -78,7 +84,8 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
     }
     const decision = out!;
     // 落盤（失敗 throw → 呼叫端 apply-failed；記憶體先行是刻意的：下次同步/hydrate 收斂）
-    await repo.persistRows(kind === 'budget' ? 'singletons' : kind, decision.changed);
+    const storeName: repo.StoreName = kind === 'budget' ? 'singletons' : kind;
+    await repo.persistRows(storeName, decision.changed);
     // 水位回撥：合入了早於既存 checkpoint 的列（舊備份/三裝置轉手）時，
     // 不回撥的話這些列永遠不會轉送給其他 peer
     if (decision.minTaken !== '') {
@@ -92,10 +99,11 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
 
   function myHello(): PeerHello {
     const s = get();
+    const myId = getPersonId();
     return {
       deviceId: getDeviceId(),
-      person: s.settings.myPerson,
-      personNames: s.settings.personNames,
+      personId: myId,
+      personName: s.persons.get(myId)?.name ?? '我',
       // tick 而非 peek：hello 本身就是事件。從未寫過帳的全新裝置 peek 會是 HLC 零值，
       // checkpoint = min(雙方) 就被拖成 0 ⇒ 下次同步永遠全量重送
       hlcNow: tickClock(),
@@ -128,6 +136,7 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
     handle = startSync(code, myHello(), {
       getLocalRows(kind) {
         const s = get();
+        if (kind === 'persons') return [...s.persons.values()];
         if (kind === 'records') return [...s.records.values()];
         if (kind === 'categories') return [...s.categories.values()];
         if (kind === 'rules') return [...s.rules.values()];
@@ -135,20 +144,16 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
       },
       applyBatch,
       onPeerHello(peer) {
+        // v2：名字不在 hello 採納——人物 row 走 persons 同步實體、只有本人會編輯
         recvClock(peer.hlcNow);
         set({ clockDriftMs: Math.abs(Date.now() - peer.wallMs) });
-        // 對方最清楚自己的稱呼：採納對方 person 槽位的名字（本機槽位不動）
-        const s = get();
-        const theirName = peer.personNames[peer.person];
-        if (theirName && peer.person !== s.settings.myPerson && s.settings.personNames[peer.person] !== theirName) {
-          s.updateSettings({ personNames: { ...s.settings.personNames, [peer.person]: theirName } });
-        }
       },
       saveCheckpoint(peer, checkpoint) {
         void repo
           .savePeer({
             peerDeviceId: peer.deviceId,
-            label: peer.personNames[peer.person] || peer.deviceId,
+            peerPersonId: peer.personId,
+            label: peer.personName || peer.deviceId,
             lastSyncedAt: checkpoint,
             lastSyncWallMs: Date.now(),
           })
@@ -209,6 +214,7 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
           records: s.records.values(),
           categories: s.categories.values(),
           rules: s.rules.values(),
+          persons: s.persons.values(),
           budget: s.budget,
         }),
       );
@@ -226,12 +232,13 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
       // 吸收匯入資料的最大 HLC（與 P2P 的 onPeerHello recvClock 對稱）：
       // 不吸收的話，匯入後的本機編輯 HLC 可能小於匯入列 ⇒ 下次同步被無聲還原
       let maxHlc = '';
-      for (const r of [...env.records, ...env.categories, ...env.rules, ...(env.budget ? [env.budget] : [])]) {
+      for (const r of [...env.persons, ...env.records, ...env.categories, ...env.rules, ...(env.budget ? [env.budget] : [])]) {
         if (r.updatedAt > maxHlc) maxHlc = r.updatedAt;
       }
       if (maxHlc) recvClock(maxHlc); // recvClock 對非正準字串安全忽略（parseImport 已驗 HLC 形）
       const totals = { ...EMPTY_TOTALS };
       const batches: readonly [SyncKind, readonly Syncable[]][] = [
+        ['persons', env.persons],
         ['records', env.records],
         ['categories', env.categories],
         ['rules', env.rules],
