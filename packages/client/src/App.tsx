@@ -11,6 +11,8 @@ import { LedgerScreen } from './ui/LedgerScreen';
 import { EntrySheet } from './ui/EntrySheet';
 import { CategoriesScreen } from './ui/CategoriesScreen';
 import { SettingsScreen } from './ui/SettingsScreen';
+import { StatsScreen } from './ui/StatsScreen';
+import { InkDefs } from './ui/charts/InkDefs';
 import { APP, NAV, PLACEHOLDER } from './strings/ui';
 
 function PlaceholderScreen() {
@@ -61,6 +63,8 @@ export function App() {
 
   return (
     <div className="app-shell">
+      {/* SVG 濾鏡定義：url(#ink-bleed) 全站可引（帳本預算刷與統計圖表共用） */}
+      <InkDefs />
       <div key={screen} className="screen">
         <header className="app-top">
           <span className="app-title">
@@ -76,6 +80,7 @@ export function App() {
           </button>
         </header>
         {screen === 'ledger' ? <LedgerScreen />
+          : screen === 'stats' ? <StatsScreen />
           : screen === 'categories' ? <CategoriesScreen />
           : screen === 'settings' ? <SettingsScreen />
           : <PlaceholderScreen />}

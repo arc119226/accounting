@@ -5,6 +5,7 @@
 @import './styles/components.css';
 @import './styles/ledger.css';
 @import './styles/entry.css';
+@import './styles/stats.css';
 @import './styles/dialogs.css';
 @import './styles/toast.css';
 @import './styles/nav.css';

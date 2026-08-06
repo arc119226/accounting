@@ -46,3 +46,13 @@ export {
   type MergeSummary,
   type MergeVerdict,
 } from './merge';
+export {
+  dailyTrend,
+  sumByCategory,
+  sumByMonth,
+  sumByPerson,
+  type CategoryTotal,
+  type DayPoint,
+  type MonthTotal,
+} from './stats';
+export { budgetProgress, type BudgetLine, type BudgetProgress } from './budget';

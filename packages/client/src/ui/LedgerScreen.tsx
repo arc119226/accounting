@@ -3,9 +3,10 @@
  * 清單資料全由記憶體 Map 過濾（單月 <300 筆，不需虛擬化）。
  */
 import { useEffect, useMemo, useRef } from 'react';
-import { addMonths, formatMonthZh, formatNTD, monthOf, type ExpenseRecord } from '@zhangben/core';
+import { addMonths, budgetProgress, formatMonthZh, formatNTD, monthOf, type ExpenseRecord } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
 import { attachDrag } from '../gesture';
+import { BudgetTotalBrush } from './charts/BudgetBrush';
 import { LEDGER } from '../strings/ui';
 
 /** 分類印章：色彩經 color-mix 65% 壓向墨色（高彩在宣紙上才不刺眼） */
@@ -70,6 +71,7 @@ function DayGroup({ date, rows }: { date: string; rows: ExpenseRecord[] }) {
 
 export function LedgerScreen() {
   const records = useAppStore((s) => s.records);
+  const budget = useAppStore((s) => s.budget);
   const monthCursor = useAppStore((s) => s.monthCursor);
   const setMonth = useAppStore((s) => s.setMonth);
   const openEntry = useAppStore((s) => s.openEntry);
@@ -106,6 +108,10 @@ export function LedgerScreen() {
   }, [setMonth]);
 
   const monthTotal = totals.A + totals.B;
+  const budgetProg = useMemo(
+    () => budgetProgress(records.values(), budget, monthCursor),
+    [records, budget, monthCursor],
+  );
 
   return (
     <div className="screen-body ledger-body" ref={listRef}>
@@ -130,6 +136,8 @@ export function LedgerScreen() {
           </div>
         ))}
       </div>
+
+      <BudgetTotalBrush progress={budgetProg} compact />
 
       {groups.length === 0 ? (
         <p className="dim-text empty-hint">{LEDGER.emptyMonth}</p>

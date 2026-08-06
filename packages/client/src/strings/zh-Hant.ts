@@ -86,6 +86,32 @@ export const CATEGORIES = {
   moveDown: '下移',
 } as const;
 
+export const STATS = {
+  thisMonth: '本月',
+  lastMonth: '上月',
+  thisYear: '今年',
+  custom: '自訂',
+  from: '起',
+  to: '迄',
+  barTitle: '月度變化',
+  donutTitle: '分類占比',
+  trendTitle: '累積趨勢',
+  trendHint: '虛線為上月同期',
+  personTitle: '兩人比較',
+  budgetTitle: '預算',
+  emptyRange: '此區間沒有記錄，紙上留白。',
+  countSuffix: ' 筆',
+} as const;
+
+export const BUDGET = {
+  title: '每月預算',
+  totalLabel: '每月總預算',
+  perCatLabel: '各分類上限',
+  zeroHint: '填 0 = 不設限',
+  save: '儲存預算',
+  savedToast: '預算已更新',
+} as const;
+
 export const SETTINGS = {
   title: '設定',
   whoAmI: '這支手機的主人',

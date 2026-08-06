@@ -1,0 +1,115 @@
+/* 統計頁：圖表文字、動畫、圖例、預算墨刷、自訂區間 */
+.chart-svg { width: 100%; height: auto; display: block; }
+.chart-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.chart-hint { font-size: 11px; font-weight: 400; letter-spacing: 0; }
+
+/* SVG 內文字：CSS 統一（屬性寫死會逃過主題） */
+.chart-tick { font-size: 10px; fill: var(--dim); font-family: var(--font-body); }
+.chart-tick.focus { fill: var(--gold); font-weight: 700; }
+.chart-value { font-size: 11px; fill: var(--scroll-ink); font-weight: 600; }
+
+/* 長條：由底長出、逐條 stagger */
+.bar-anim {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: barGrow 0.5s ease both;
+}
+@keyframes barGrow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+/* 趨勢線與環弧：pathLength=1 歸一後「筆畫自己畫出來」 */
+.trend-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: drawStroke 0.9s ease-out 0.15s both;
+}
+.donut-arc {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: drawStroke 0.6s ease-out both;
+}
+@keyframes drawStroke {
+  to { stroke-dashoffset: 0; }
+}
+
+.donut-svg { max-width: 230px; margin: 0 auto; }
+.donut-total-label { font-size: 12px; fill: var(--dim); letter-spacing: 0.3em; }
+.donut-total { font-size: 21px; fill: var(--scroll-ink); font-weight: 700; font-family: var(--font-display); }
+
+.donut-legend { display: flex; flex-direction: column; }
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent);
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  min-height: 44px;
+}
+.legend-row:last-child { border-bottom: none; }
+.legend-row.active { background: var(--seg-active-bg); border-radius: 8px; }
+.legend-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legend-count { font-size: 12px; }
+.legend-amount { font-weight: 600; }
+.legend-pct { font-size: 12px; min-width: 34px; text-align: right; }
+
+.picked-list {
+  border-top: 1px dashed var(--line-gold);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+/* 兩人拔河 */
+.person-split { display: flex; flex-direction: column; gap: 6px; }
+.split-ends { display: flex; justify-content: space-between; font-size: 14px; }
+.split-caption { text-align: center; font-size: 13px; }
+
+/* 預算墨刷 */
+.budget-brush { display: flex; flex-direction: column; gap: 4px; }
+.budget-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+}
+.budget-label { color: var(--dim); letter-spacing: 0.12em; }
+.over-red { color: var(--scroll-zhu); font-weight: 700; }
+.budget-over-note { margin: 0; font-size: 13px; text-align: right; }
+.budget-cats { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.budget-cat-line { display: flex; flex-direction: column; gap: 2px; }
+.budget-brush.compact .budget-head { font-size: 12px; }
+
+/* 自訂區間 */
+.custom-range {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.month-stepper { display: inline-flex; align-items: center; gap: 4px; }
+.stepper-btn { min-width: 36px; padding: 4px 8px; }
+
+/* 預算設定（設定頁） */
+.budget-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.budget-input-row .cat-name { flex: 1; }
+.budget-input-row .text-input { max-width: 120px; text-align: right; }

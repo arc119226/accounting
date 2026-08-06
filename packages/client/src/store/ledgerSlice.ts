@@ -55,6 +55,7 @@ export interface LedgerSlice {
   deleteCategory(id: string): void;
   /** 與相鄰分類交換 order（-1=往前、+1=往後） */
   moveCategory(id: string, dir: -1 | 1): void;
+  setBudget(monthlyTotal: number, perCategory: Readonly<Record<string, number>>): void;
 }
 
 /** 今天（裝置當地）的 'YYYY-MM-DD'——UI 層唯一的「現在」來源，core 不取時間 */
@@ -235,6 +236,22 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
     categories.set(id, row);
     set({ categories });
     persist(repo.putCategory(row), 'putCategory(tombstone)');
+  },
+
+  setBudget(monthlyTotal, perCategory) {
+    // 只留 >0 的分類上限（0=不設限=不佔鍵）
+    const cleaned: Record<string, number> = {};
+    for (const [k, v] of Object.entries(perCategory)) if (v > 0) cleaned[k] = v;
+    const row = {
+      id: 'budget',
+      updatedAt: tickClock(),
+      deviceId: getDeviceId(),
+      deleted: false,
+      monthlyTotal: Math.max(0, monthlyTotal),
+      perCategory: cleaned,
+    };
+    set({ budget: row });
+    persist(repo.putBudget(row), 'putBudget');
   },
 
   moveCategory(id, dir) {
