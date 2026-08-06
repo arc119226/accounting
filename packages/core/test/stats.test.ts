@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { DateRange } from '../src/rocdate';
-import { addMonths, daysInMonth } from '../src/rocdate';
+import { addMonths, daysInMonth, monthRange } from '../src/rocdate';
 import type { ExpenseRecord } from '../src/types';
 import { dailyTrend, monthSummary, sumByCategory, sumByMonth, sumByPerson } from '../src/stats';
 import type { CategoryTotal, DayPoint, MonthTotal } from '../src/stats';
@@ -390,6 +390,29 @@ describe('monthSummary', () => {
     expect(s.delta).toBe(300);
   });
 
+  /**
+   * deltaPct 用四捨五入（away from zero）而非 Math.round（round-half-up，往 +∞）。
+   * Math.round 會讓 −1.5% 收成 −1 而 +1.5% 收成 +2——同幅度的增與減顯示出不同的
+   * 絕對值；−0.5% 更會得到 **−0**，畫面上長出「-0%」這種東西。
+   */
+  it('deltaPct：±.5 對稱捨入，且不產生 -0', () => {
+    const pct = (prev: number, cur: number): number | null =>
+      monthSummary(
+        [
+          r({ id: 'p', date: '2026-07-10', amount: prev }),
+          r({ id: 'c', date: '2026-08-10', amount: cur }),
+        ],
+        '2026-08',
+        3,
+      ).deltaPct;
+    expect(pct(200, 203)).toBe(2); // +1.5% → +2
+    expect(pct(200, 197)).toBe(-2); // −1.5% → −2（Math.round 會給 −1）
+    expect(pct(200, 199)).toBe(-1); // −0.5% → −1（Math.round 會給 −0）
+    expect(pct(200, 201)).toBe(1); // +0.5% → +1
+    expect(Object.is(pct(1000, 999), -0)).toBe(false); // −0.1% → 0，不是 −0
+    expect(pct(1000, 999)).toBe(0);
+  });
+
   it('movers 取兩月分類的聯集——這個月完全沒花的分類正是最該被看見的變動', () => {
     const s = monthSummary(
       [
@@ -486,6 +509,58 @@ describe('monthSummary', () => {
           .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || (a.categoryId < b.categoryId ? -1 : 1))
           .slice(0, 3);
         expect(got.movers).toEqual(expected);
+      }),
+    );
+  });
+});
+
+/**
+ * 「算術不談判」——BACKLOG 原則一的機器版本。
+ *
+ * 上面每個函式各自對照一份暴力 oracle，鎖的是「這支函式忠於它自己的規格」。
+ * 缺的是**跨切面**的那一條：同一個月的總和，不管從哪個角度切，都必須是同一個數。
+ * 這正是原則一所依賴的機制——逐筆的自欺會在加總時露餡，前提是各處的加總對得起來。
+ *
+ * 這條測試同時是一道護欄：任何「把某類支出排除在統計外」「隱藏這筆」「估算金額」
+ * 的功能，只要讓某一個切面的總和偏離其他切面，就會在這裡炸開，而不是等到某天
+ * 有人發現月結卡跟排行榜對不起來。
+ */
+describe('算術不談判：同一個月的總和，從哪個角度切都一樣', () => {
+  const sumVals = (xs: Iterable<number>): number => {
+    let t = 0;
+    for (const x of xs) t += x;
+    return t;
+  };
+
+  it('property：分類切 = 人物切 = 逐日切 = 逐月切 = 月結卡', () => {
+    fc.assert(
+      fc.property(fc.array(recordArb, { maxLength: 60 }), monthArb, (recs, month) => {
+        const range = monthRange(month);
+        const byCategory = sumVals(sumByCategory(recs, range).map((c) => c.total));
+        const byPerson = sumVals(sumByPerson(recs, range).values());
+        const daily = dailyTrend(recs, month);
+        const byDay = sumVals(daily.map((d) => d.total));
+        const byMonth = sumByMonth(recs, 1, month)[0]!.total;
+        const summary = monthSummary(recs, month, 3).total;
+
+        expect(byPerson).toBe(byCategory);
+        expect(byDay).toBe(byCategory);
+        expect(byMonth).toBe(byCategory);
+        expect(summary).toBe(byCategory);
+        // 累積曲線的終點就是月合計（趨勢圖與排行榜不可以各說各話）
+        expect(daily[daily.length - 1]!.cumulative).toBe(byCategory);
+      }),
+    );
+  });
+
+  it('property：monthSummary 的 delta 與 prevTotal 對得上 sumByMonth 的相鄰兩格', () => {
+    fc.assert(
+      fc.property(fc.array(recordArb, { maxLength: 60 }), monthArb, (recs, month) => {
+        const two = sumByMonth(recs, 2, month);
+        const s = monthSummary(recs, month, 3);
+        expect(s.prevTotal).toBe(two[0]!.total);
+        expect(s.total).toBe(two[1]!.total);
+        expect(s.delta).toBe(s.total - s.prevTotal);
       }),
     );
   });

@@ -112,6 +112,44 @@ describe('hlcTick', () => {
   });
 });
 
+/**
+ * wallMs 非整數 —— 全案唯一「一個輸入就能無聲毀掉全部同步」的類別。
+ *
+ * ms 是唯一被 padStart(15,'0') 定寬編碼的欄位，而定寬正是「字典序＝全序」的根基
+ * （merge.ts 熱路徑只比字串、從不解碼）。1234.5 會編出 '00000000001234.5'：
+ * 16 個字元、還帶小數點，定寬破裂、全序報銷，而且沒有任何地方會報錯。
+ * 呼叫端目前只餵 Date.now()（必為整數）所以踩不到——正因為踩不到，更要有測試守著，
+ * 未來任何人改用 performance.timeOrigin+performance.now() 之類的來源就會在這裡炸。
+ */
+describe('wallMs 的定寬防線', () => {
+  const widthOk = (h: { ms: number; ctr: number; device: string }): boolean =>
+    /^\d{15}-[0-9a-f]{4}-/.test(hlcEncode(h));
+
+  it('小數 wallMs 不得破壞定寬（tick 與 recv 皆然）', () => {
+    const prev = { ms: 100, ctr: 0, device: 'a' };
+    expect(widthOk(hlcTick(prev, 1234.5))).toBe(true);
+    expect(hlcTick(prev, 1234.5).ms).toBe(1234);
+    expect(widthOk(hlcRecv(prev, { ms: 50, ctr: 0, device: 'b' }, 9999.99))).toBe(true);
+  });
+
+  it('NaN / Infinity 的 wallMs 退化成「牆鐘沒前進」而不是產生壞編碼', () => {
+    const prev = { ms: 100, ctr: 7, device: 'a' };
+    expect(hlcTick(prev, NaN)).toEqual({ ms: 100, ctr: 8, device: 'a' });
+    expect(hlcTick(prev, Infinity)).toEqual({ ms: 100, ctr: 8, device: 'a' });
+    expect(widthOk(hlcTick(prev, NaN))).toBe(true);
+  });
+
+  it('property：任意有限 wallMs（含小數、負值）都編得出定寬字串且仍嚴格遞增', () => {
+    fc.assert(
+      fc.property(hlcArb, fc.double({ min: -1e12, max: 1e12, noNaN: true }), (prev, wallMs) => {
+        const next = hlcTick(prev, wallMs);
+        expect(widthOk(next)).toBe(true);
+        expect(hlcCompare(hlcEncode(next), hlcEncode(prev))).toBeGreaterThan(0);
+      }),
+    );
+  });
+});
+
 describe('hlcRecv', () => {
   it('property：recv 嚴格大於雙輸入（收訊本身也是事件）', () => {
     fc.assert(
