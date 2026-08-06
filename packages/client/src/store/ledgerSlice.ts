@@ -7,7 +7,7 @@
  */
 import type { StateCreator } from 'zustand';
 import type { Budget, Category, ExpenseRecord, MerchantRule, ParsedInvoice, Person } from '@zhangben/core';
-import { monthOf, restoreRecord as coreRestoreRecord } from '@zhangben/core';
+import { monthOf, restoreRecord as coreRestoreRecord, sortCategories } from '@zhangben/core';
 import type { AppStore } from './appStore';
 import * as repo from '../db/repo';
 import { seedClock, tickClock } from '../clock';
@@ -224,9 +224,9 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
 
   openEntry(init) {
     const s = get();
-    const firstCat = [...s.categories.values()]
-      .filter((c) => !c.deleted)
-      .sort((a, b) => a.order - b.order)[0];
+    // 同樣走 sortCategories：「預設分類」該是使用者在籤條上看到的第一顆，
+    // 各排各的就會在撞號時挑到別的
+    const firstCat = sortCategories(s.categories.values())[0];
     set({
       entryDraft: {
         editingId: null,
@@ -464,19 +464,27 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
 
   moveCategory(id, dir) {
     const s = get();
-    const alive = [...s.categories.values()].filter((c) => !c.deleted).sort((a, b) => a.order - b.order);
+    // **與 UI 用同一支排序**：這裡原本只按 order 排，而畫面用的是 core 的
+    // sortCategories（order → name → id）。兩者不一致時，按 ▲ 找到的 idx 對應的
+    // 是另一列，跳動的是根本沒被點到的那一顆。
+    const alive = sortCategories(s.categories.values());
     const idx = alive.findIndex((c) => c.id === id);
-    const other = alive[idx + dir];
-    const self = alive[idx];
-    if (!self || !other) return;
-    // 交換 order；兩筆都要 bump 信封（同步後對方才收斂到同一順序）
-    const a: Category = { ...self, order: other.order, updatedAt: tickClock(), deviceId: getDeviceId() };
-    const b: Category = { ...other, order: self.order, updatedAt: tickClock(), deviceId: getDeviceId() };
+    const j = idx + dir;
+    if (idx < 0 || j < 0 || j >= alive.length) return;
+    const reordered = [...alive];
+    [reordered[idx], reordered[j]] = [reordered[j]!, reordered[idx]!];
+    // **重編 1..N 而不是互換 order**：撞號是常態（兩台各自新增分類都算出
+    // maxOrder+1），而撞號時互換 order 是 no-op——畫面毫無反應，卻照樣 bump
+    // 兩個信封同步給對方，那兩顆分類的 ▲▼ 從此永久失效。
+    // 只寫 order 真的變了的列：order 互異時剛好 2 筆，與原本的行為位元相同。
+    const changed = reordered
+      .map((c, i) => ({ c, order: i + 1 }))
+      .filter(({ c, order }) => c.order !== order)
+      .map(({ c, order }): Category => ({ ...c, order, updatedAt: tickClock(), deviceId: getDeviceId() }));
+    if (changed.length === 0) return;
     const categories = new Map(s.categories);
-    categories.set(a.id, a);
-    categories.set(b.id, b);
+    for (const row of changed) categories.set(row.id, row);
     set({ categories });
-    persist(repo.putCategory(a), 'putCategory(order)');
-    persist(repo.putCategory(b), 'putCategory(order)');
+    for (const row of changed) persist(repo.putCategory(row), 'putCategory(order)');
   },
 });
