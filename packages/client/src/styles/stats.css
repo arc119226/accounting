@@ -89,6 +89,8 @@
 }
 .budget-label { color: var(--dim); letter-spacing: 0.12em; }
 .over-red { color: var(--scroll-zhu); font-weight: 700; }
+/* 花得比上月少：玉青（既有 accent），不發明新的綠 */
+.mover-down { color: var(--accent); font-weight: 700; }
 .budget-over-note { margin: 0; font-size: 13px; text-align: right; }
 .budget-cats { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .budget-cat-line { display: flex; flex-direction: column; gap: 2px; }
@@ -103,7 +105,7 @@
   flex-wrap: wrap;
 }
 .month-stepper { display: inline-flex; align-items: center; gap: 4px; }
-.stepper-btn { min-width: 36px; padding: 4px 8px; }
+.stepper-btn { min-width: 44px; padding: 4px 8px; }
 
 /* 預算設定（設定頁） */
 .budget-input-row {

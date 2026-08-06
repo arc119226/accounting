@@ -154,6 +154,7 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── 直書籤條（分類選擇器；sr2 wm-label 血統） ── */
 .paper-label {
+  position: relative;
   padding: 7px 5px 8px;
   border: 1px solid #00000026;
   border-radius: 3px;
@@ -174,6 +175,11 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 .paper-label:hover,
 .paper-label:focus-visible { box-shadow: 0 3px 12px #00000066; filter: brightness(1.06); }
 .paper-label.active { outline: 2px solid var(--scroll-zhu); outline-offset: 1px; }
+/* 籤條刻意窄（15px 直書字＋5px 內距＝27px 寬），但觸控面也只有 27px——記帳最常點的東西。
+   透明 ::after 往左右各撐 5px（＝剛好鋪滿 .cat-scroller 的 gap，相鄰命中區恰好接壤不重疊），
+   視覺不動、有效寬 27→37px。**沒有到 44**：真要 44 得把籤條加粗一倍、
+   比例從 1:2.8 變 1:1.7，那就不是籤條了，這是刻意的取捨。 */
+.paper-label::after { content: ''; position: absolute; inset: 0 -5px; }
 
 /* ── 雜項 ── */
 .dim-text { color: var(--dim); margin: 0; }
@@ -188,7 +194,8 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* 觸控裝置：互動元件一律 44px 下限（sr2 慣例，media coarse 強制） */
+/* 觸控裝置：互動元件一律 44px 下限（sr2 慣例，media coarse 強制）。
+   .text-input（原 37px）與 .app-toast-btn（原 26px）本來漏在清單外。 */
 @media (pointer: coarse) {
-  .primary-btn, .ghost-btn, .seg-btn, .danger-btn { min-height: 44px; }
+  .primary-btn, .ghost-btn, .seg-btn, .danger-btn, .text-input, .app-toast-btn { min-height: 44px; }
 }

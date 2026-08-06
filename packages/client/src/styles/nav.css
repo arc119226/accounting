@@ -1,6 +1,8 @@
 /* App 殼版面：頂欄 + 內容 + 底部導覽（safe-area 一律 max() 包住，桌面不受影響） */
+/* 扣掉軟鍵盤：iOS 不縮版面視窗，不扣的話整個殼（含底部導覽）會沉在鍵盤下面。
+   var() 一律帶 fallback——--kb 若失效，calc() 會整條無效讓 height 掉回 auto，版面直接塌。 */
 .app-shell {
-  height: 100%;
+  height: calc(100% - var(--kb, 0px));
   display: flex;
   flex-direction: column;
 }

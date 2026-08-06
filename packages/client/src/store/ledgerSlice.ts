@@ -7,7 +7,7 @@
  */
 import type { StateCreator } from 'zustand';
 import type { Budget, Category, ExpenseRecord, MerchantRule, ParsedInvoice, Person } from '@zhangben/core';
-import { monthOf } from '@zhangben/core';
+import { monthOf, restoreRecord as coreRestoreRecord } from '@zhangben/core';
 import type { AppStore } from './appStore';
 import * as repo from '../db/repo';
 import { tickClock } from '../clock';
@@ -25,6 +25,22 @@ export interface EntryDraft {
   readonly merchantName: string;
   /** Person.id（v2） */
   readonly paidBy: string;
+}
+
+/**
+ * 記錄 → 抽屜草稿。三處（帳本列、統計的分類明細、掃描的「查看該筆」）本來各抄一份，
+ * 月結摘要卡會是第四份——抄第四次前先抽出來。
+ */
+export function draftFromRecord(r: ExpenseRecord): EntryDraft {
+  return {
+    editingId: r.id,
+    amount: r.amount,
+    date: r.date,
+    categoryId: r.categoryId,
+    note: r.note,
+    merchantName: r.merchant?.name ?? '',
+    paidBy: r.paidBy,
+  };
 }
 
 export interface EntryValues {
@@ -51,9 +67,15 @@ export interface LedgerSlice {
   setMonth(month: string): void;
   openEntry(init?: Partial<EntryDraft>): void;
   closeEntry(): void;
-  /** 新增或更新（依 draft.editingId）；回傳寫入的記錄 id */
-  saveEntry(values: EntryValues): string;
-  deleteRecord(id: string): void;
+  /**
+   * 新增或更新（依 draft.editingId）；回傳寫入的記錄 id。
+   * keepOpen：存完後續留抽屜（連續記帳），只在新增模式生效。
+   */
+  saveEntry(values: EntryValues, keepOpen?: boolean): string;
+  /** 刪除（寫墓碑）；回傳**剝號前**的完整原列供復原，不存在/已刪則 null */
+  deleteRecord(id: string): ExpenseRecord | null;
+  /** 復原墓碑：整列寫回、換新信封（LWW 天然贏過墓碑，跨裝置也成立） */
+  restoreRecord(row: ExpenseRecord): void;
   addCategory(name: string, glyph: string, color: string): void;
   updateCategory(id: string, patch: Partial<Pick<Category, 'name' | 'glyph' | 'color'>>): void;
   deleteCategory(id: string): void;
@@ -206,7 +228,7 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
     set({ entryDraft: null });
   },
 
-  saveEntry(values) {
+  saveEntry(values, keepOpen) {
     const s = get();
     const draft = s.entryDraft;
     const existing = draft?.editingId ? s.records.get(draft.editingId) : undefined;
@@ -247,7 +269,22 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
         };
     const records = new Map(s.records);
     records.set(row.id, row);
-    set({ records, entryDraft: null });
+    // keepOpen（連續記帳）：留一份新 draft 而不是 null——entryDraft 始終非 null ⇒
+    // App 的 entryOpen 不翻轉 ⇒ 不重繪 ⇒ key 不重算 ⇒ 抽屜不重掛（元件的本地 state
+    // 自己清，見 EntrySheet）。只在新增模式生效：編輯完就該關。
+    const nextDraft: EntryDraft | null =
+      keepOpen && !existing
+        ? {
+            editingId: null,
+            amount: null,
+            date: values.date,
+            categoryId: values.categoryId,
+            note: '',
+            merchantName: '',
+            paidBy: values.paidBy,
+          }
+        : null;
+    set({ records, entryDraft: nextDraft });
     persist(repo.putRecord(row), 'putRecord');
     return row.id;
   },
@@ -255,7 +292,7 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
   deleteRecord(id) {
     const s = get();
     const existing = s.records.get(id);
-    if (!existing || existing.deleted) return;
+    if (!existing || existing.deleted) return null;
     // 墓碑必須剝除 invoice（審查修正）：留著號碼會佔住 by-invoice unique index——
     // 重掃同張發票會被落盤拒絕、同步收到對方同號活記錄時整批 tx 炸掉
     const { invoice: _dropped, ...rest } = existing;
@@ -265,6 +302,20 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
     records.set(id, row);
     set({ records, entryDraft: null });
     persist(repo.putRecord(row), 'putRecord(tombstone)');
+    // 回傳**剝號前**的完整原列，供復原 toast——這是唯一還拿得到 invoice/items 的時機
+    return existing;
+  },
+
+  restoreRecord(row) {
+    const s = get();
+    const restored = coreRestoreRecord(s.records, row, {
+      updatedAt: tickClock(),
+      deviceId: getDeviceId(),
+    });
+    const records = new Map(s.records);
+    records.set(restored.id, restored);
+    set({ records });
+    persist(repo.putRecord(restored), 'putRecord(restore)');
   },
 
   addCategory(name, glyph, color) {

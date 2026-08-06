@@ -3,10 +3,11 @@
  * 跑在 node——idb 直接吃 fake-indexeddb 的全域注入。
  */
 import 'fake-indexeddb/auto';
+import { openDB } from 'idb';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ExpenseRecord } from '@zhangben/core';
 import * as repo from '../src/db/repo';
-import { closeDbForTests } from '../src/db/db';
+import { closeDbForTests, upgradeZbDb, type ZbDB } from '../src/db/db';
 
 // 每個測試都要全新 DB：先關連線（開啟中的連線會 block deleteDatabase）再刪庫
 async function resetDb(): Promise<void> {
@@ -73,5 +74,30 @@ describe('db/repo', () => {
     await repo.putRecord(rec({ id: 'r2' }));
     const loaded = await repo.loadAll();
     expect(loaded.records.size).toBe(2);
+  });
+
+  /**
+   * 升級護欄的回歸：v1→v2 那次「清空重來」的條件曾是 `oldVersion > 0`，
+   * 意思是**將來每一次版本升級都會先把使用者的帳本刪光**。正式資料已經在跑了，
+   * 這條測試就是那把槍的保險栓——它失敗＝有人重新讓升級變成資料抹除。
+   */
+  it('v2 有資料 → 升到 v3：記錄與 meta 全部留著（升級不抹資料）', async () => {
+    await repo.loadAll();
+    await repo.putRecord(rec({ id: 'r1', amount: 250 }));
+    await repo.savePeer({
+      peerDeviceId: 'ppp',
+      peerPersonId: 'person-ppp',
+      label: '乙',
+      lastSyncedAt: '000000000000008-0000-ppp',
+      lastSyncWallMs: 1,
+    });
+    await closeDbForTests();
+
+    // 以「未來的 v3」重開同一個庫，跑的是實際那支 upgrade
+    const v3 = await openDB<ZbDB>('zhangben', 3, { upgrade: upgradeZbDb });
+    expect((await v3.get('records', 'r1'))?.amount).toBe(250);
+    expect((await v3.getAll('categories')).length).toBe(8);
+    expect(await v3.get('meta', 'peers')).toHaveLength(1);
+    v3.close();
   });
 });

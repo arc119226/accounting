@@ -2,7 +2,10 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- interactive-widget=resizes-content：Android Chrome 108+ 預設改成不縮版面視窗，
+         軟鍵盤於是直接蓋住底部抽屜。設回 resizes-content 讓 100dvh → .app-shell → .screen-body
+         整條自動反應。Safari 忽略未知鍵（它走 src/keyboard.ts 的 --kb 手動讓位）。 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>柴米帳</title>
     <meta name="description" content="柴米帳——兩個人的宣紙記帳本。掃發票、記日常，面對面同步。" />
     <meta name="theme-color" content="#e7dcc3" />

@@ -1,7 +1,8 @@
 /* 對話框（sr2 dialogs.css 血統）：overlay 點擊=取消、卡片 stopPropagation、Esc 監聽在元件 */
 .modal-overlay {
   position: fixed;
-  inset: 0;
+  /* 底邊讓開軟鍵盤（取名卡有 autoFocus，鍵盤一定是開著的） */
+  inset: 0 0 var(--kb, 0px) 0;
   background: var(--scrim);
   display: flex;
   align-items: center;
@@ -17,8 +18,11 @@
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 22px 26px;
-  min-width: 300px;
-  max-width: 90vw;
+  /* min-width 依規範贏過 max-width：寫死 300px 時，320px 機（或 iOS 顯示縮放）
+     扣掉 overlay 內距只剩 296px，卡片會撐出橫向捲動。
+     max 改用 100% 而非 90vw：vw 不扣 overlay 內距，也不扣桌面捲軸寬。 */
+  min-width: min(300px, 100%);
+  max-width: min(420px, 100%);
   margin: auto; /* 放得下=置中；放不下=完整捲動 */
   box-shadow: inset 0 1px 0 #fff7e2aa, 0 12px 40px rgba(0, 0, 0, 0.4);
 }

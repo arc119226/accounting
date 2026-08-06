@@ -28,6 +28,21 @@
   text-transform: uppercase;
   font-variant-numeric: tabular-nums;
 }
+/* App 內掃配對碼：沿用掃發票的取景器樣式（scan.css 先於本檔載入），只補尺寸與取消鈕 */
+.join-viewport {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 46dvh;
+  margin: 0;
+  flex: 0 0 auto;
+}
+.join-cancel {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  background: #efe6d2e6;
+}
+
 .sync-status { margin: 0; letter-spacing: 0.08em; }
 .sync-err { margin: 0; font-size: 14px; }
 

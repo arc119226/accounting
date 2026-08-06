@@ -4,14 +4,18 @@ import { ErrorBoundary } from './ui/ErrorBoundary';
 import { initErrorLog } from './errlog';
 import { APP_VERSION, initUpdateCheck } from './version';
 import { setSaveErrorHandler } from './storage';
+import { initKeyboardInsets } from './keyboard';
 import { show } from './notice';
 import { useAppStore } from './store/appStore';
+import { parseSyncLink } from './sync/deepLink';
 import './styles.css';
 
 // 可觀測性：render 前掛全域錯誤日誌（ErrorBoundary 接不到的 async/動態 import 全在這）
 initErrorLog(APP_VERSION);
 // 更新偵測（DEV 早退）：visibilitychange + 10 分鐘輪詢 version.json
 initUpdateCheck();
+// 軟鍵盤讓位：量 visualViewport 寫 --kb（iOS 專用；Android 靠 viewport meta 自己縮）
+initKeyboardInsets();
 // 設定寫失敗=session 內提示一次（saveJson 原契約靜默不變，只多掛通知）
 let saveErrNotified = false;
 setSaveErrorHandler(() => {
@@ -25,13 +29,14 @@ void useAppStore.getState().hydrate();
 void useAppStore.getState().loadPeers();
 void import('./db/persist').then((m) => m.requestPersist());
 
-// 同步 deep link：主持方 QR 內容是 https://<domain>/#sync=<code>，
-// 對方用系統相機掃 → 開 app 直接進同步頁入房
-const syncLink = /#sync=([A-Z2-9]{6})/i.exec(location.hash);
-if (syncLink) {
+// 同步 deep link：**只記意圖、不入房**。原本這裡直接 joinSync()，但 hydrate() 是 async——
+// 此刻 records 還是空的，而以空帳本完成的握手會把 checkpoint 推到頂、讓這台的帳從此
+// 不再增量傳給對方（詳見 syncSlice.begin 的閘）。真正入房的決策在 SyncScreen（等 hydrated）。
+const syncCode = parseSyncLink(location.hash);
+if (syncCode) {
   history.replaceState(null, '', location.pathname);
   useAppStore.getState().setScreen('sync');
-  useAppStore.getState().joinSync(syncLink[1]!);
+  useAppStore.getState().setPendingJoin(syncCode);
 }
 
 if (import.meta.env.DEV) {

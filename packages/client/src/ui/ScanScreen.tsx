@@ -22,11 +22,12 @@ import {
 import { useAppStore } from '../store/appStore';
 import { getPersonId } from '../ids';
 import { sortPersonsForTabs } from '../personView';
-import { todayISO } from '../store/ledgerSlice';
+import { draftFromRecord, todayISO } from '../store/ledgerSlice';
 import { getDetector } from '../scan/detector';
 import { acquireCamera } from '../scan/camera';
 import { show } from '../notice';
 import { logError } from '../errlog';
+import { noteFromItems } from '../noteFromItems';
 import { ENTRY, SCAN } from '../strings/ui';
 
 type Phase = 'starting' | 'camera' | 'denied';
@@ -34,8 +35,25 @@ type Result =
   | { readonly kind: 'preview'; readonly inv: ParsedInvoice }
   | { readonly kind: 'exists'; readonly rec: ExpenseRecord };
 
+/**
+ * 這次開著 app 期間已入帳的發票號碼。
+ *
+ * 放 module 層而非 useRef：切到別的頁籤會讓 ScanScreen 卸載，而「存完→去帳本看一眼
+ * →回來，收據還在桌上」是真實動線。module 層的存活範圍剛好等於「本次」的語意，
+ * 重新整理即歸零。
+ */
+const savedThisSession = new Set<string>();
+
 /** 掃描預覽卡（可編輯後入帳） */
-function PreviewCard({ inv, onDone, onRescan }: { inv: ParsedInvoice; onDone: () => void; onRescan: () => void }) {
+function PreviewCard({
+  inv,
+  onSaved,
+  onRescan,
+}: {
+  inv: ParsedInvoice;
+  onSaved: (invoiceNumber: string) => void;
+  onRescan: () => void;
+}) {
   const categories = useAppStore((s) => s.categories);
   const rules = useAppStore((s) => s.rules);
   const persons = useAppStore((s) => s.persons);
@@ -51,6 +69,9 @@ function PreviewCard({ inv, onDone, onRescan }: { inv: ParsedInvoice; onDone: ()
 
   const cats = sortCategories(categories.values());
   const amount = parseAmountInput(amountStr);
+  // 品項自動備註：當 placeholder 先讓人看見會寫進去什麼，沒手打就照它落盤。
+  // 生成放這裡而不是 saveScanned：同樣的落盤結果，但不必動 app 唯一的建檔路徑。
+  const autoNote = useMemo(() => noteFromItems(inv.items), [inv]);
 
   return (
     <div className="paper-card scan-preview">
@@ -58,10 +79,9 @@ function PreviewCard({ inv, onDone, onRescan }: { inv: ParsedInvoice; onDone: ()
         <span className="seal-char">{SCAN.previewTitle.slice(0, 1)}</span>
         {SCAN.previewTitle.slice(1)}
       </div>
-      <p className="dim-text inv-no tnum">
-        {SCAN.invNoLabel} {inv.number}
-      </p>
-
+      {/* 欄位序＝「最可能要動的擺最上面」：金額是右碼合併失手時唯一會被寫錯的欄位，
+          分類是 suggestCategory 用猜的。日期與發票號碼是從左碼直接解出來的、幾乎不會錯，
+          所以往下沉；品項本來就是收合的。 */}
       <label className="field-label">{SCAN.amountLabel}</label>
       <input
         className="text-input scan-amount tnum"
@@ -70,8 +90,15 @@ function PreviewCard({ inv, onDone, onRescan }: { inv: ParsedInvoice; onDone: ()
         onChange={(e) => setAmountStr(e.target.value)}
       />
 
-      <label className="field-label">{ENTRY.dateLabel}</label>
-      <input type="date" className="text-input" value={date} max={todayISO()} onChange={(e) => e.target.value && setDate(e.target.value)} />
+      <label className="field-label">{ENTRY.categoryLabel}</label>
+      <div className="cat-scroller">
+        {cats.map((c) => (
+          <button key={c.id} className={`paper-label${categoryId === c.id ? ' active' : ''}`} onClick={() => setCategoryId(c.id)}>
+            {c.glyph}
+            {c.name}
+          </button>
+        ))}
+      </div>
 
       <label className="field-label">{ENTRY.merchantLabel}</label>
       <input
@@ -91,18 +118,21 @@ function PreviewCard({ inv, onDone, onRescan }: { inv: ParsedInvoice; onDone: ()
         ))}
       </div>
 
-      <label className="field-label">{ENTRY.categoryLabel}</label>
-      <div className="cat-scroller">
-        {cats.map((c) => (
-          <button key={c.id} className={`paper-label${categoryId === c.id ? ' active' : ''}`} onClick={() => setCategoryId(c.id)}>
-            {c.glyph}
-            {c.name}
-          </button>
-        ))}
-      </div>
+      <label className="field-label">{ENTRY.dateLabel}</label>
+      <input type="date" className="text-input" value={date} max={todayISO()} onChange={(e) => e.target.value && setDate(e.target.value)} />
 
       <label className="field-label">{ENTRY.noteLabel}</label>
-      <input className="text-input" value={note} placeholder={ENTRY.notePlaceholder} maxLength={40} onChange={(e) => setNote(e.target.value)} />
+      <input
+        className="text-input"
+        value={note}
+        placeholder={autoNote || ENTRY.notePlaceholder}
+        maxLength={40}
+        onChange={(e) => setNote(e.target.value)}
+      />
+
+      <p className="dim-text inv-no tnum">
+        {SCAN.invNoLabel} {inv.number}
+      </p>
 
       {inv.items.length > 0 && (
         <details className="scan-items">
@@ -129,9 +159,17 @@ function PreviewCard({ inv, onDone, onRescan }: { inv: ParsedInvoice; onDone: ()
           className="primary-btn save-btn"
           disabled={!amount}
           onClick={() => {
-            saveScanned({ inv, amount: amount!, date, categoryId, note: note.trim(), merchantName: merchantName.trim(), paidBy });
-            show('saved', `已記一筆 ${formatNTD(amount!)}`);
-            onDone();
+            saveScanned({
+              inv,
+              amount: amount!,
+              date,
+              categoryId,
+              note: note.trim() || autoNote,
+              merchantName: merchantName.trim(),
+              paidBy,
+            });
+            show('saved', `${ENTRY.savedNew}${formatNTD(amount!)}`);
+            onSaved(inv.number);
           }}
         >
           {SCAN.save}
@@ -174,6 +212,12 @@ export function ScanScreen() {
       if (looksLikeEInvoiceLeft(t)) {
         const parsed = parseEInvoiceLeft(t);
         if (parsed.ok) {
+          // 剛入帳的那張還躺在鏡頭裡：不要進配對窗，否則提示會每 250ms
+          // 在「已讀到左碼」與「這張剛記過」之間跳
+          if (savedThisSession.has(parsed.inv.number)) {
+            setHint(SCAN.justSaved);
+            continue;
+          }
           pair.left = parsed.inv;
           pair.leftAt = Date.now();
           setHint(SCAN.leftOnly);
@@ -190,6 +234,14 @@ export function ScanScreen() {
 
   const finish = (inv: ParsedInvoice): void => {
     const pair = pairRef.current;
+    // 剛剛才入帳的那張——鏡頭多掃到一次不該打斷連掃、也不該用「已經記過」的卡質問人。
+    // 這道守衛必須在查 invoiceIndex 之前：那張已經在索引裡了，正是今天會跳卡的原因。
+    // 兩條路（相機幀、拍照）都會經過 finish，所以守衛放這裡就夠；scanning 保持 true。
+    if (savedThisSession.has(inv.number)) {
+      pair.left = null;
+      setHint(SCAN.justSaved);
+      return;
+    }
     pair.scanning = false;
     pair.left = null;
     const existing = indexRef.current.get(inv.number);
@@ -200,6 +252,12 @@ export function ScanScreen() {
     pairRef.current = { left: null, leftAt: 0, scanning: true };
     setResult(null);
     setHint(SCAN.hintCamera);
+  };
+
+  /** 入帳完成：記下號碼（本次連掃不再攔），回相機。真正的歷史重複仍會出「已經記過」卡。 */
+  const onSaved = (invoiceNumber: string): void => {
+    savedThisSession.add(invoiceNumber);
+    resumeScan();
   };
 
   // 相機 + 偵測迴圈生命週期
@@ -317,7 +375,9 @@ export function ScanScreen() {
 
       {result?.kind === 'preview' && (
         <div className="scan-result">
-          <PreviewCard inv={result.inv} onDone={resumeScan} onRescan={resumeScan} />
+          {/* onSaved ≠ onRescan：兩者原本都是 resumeScan，掃描迴圈於是分不出
+              「剛存完」和「使用者要重掃」——分開才有辦法只略過前者 */}
+          <PreviewCard inv={result.inv} onSaved={onSaved} onRescan={resumeScan} />
         </div>
       )}
 
@@ -335,17 +395,7 @@ export function ScanScreen() {
             <div className="modal-actions">
               <button
                 className="primary-btn"
-                onClick={() =>
-                  openEntry({
-                    editingId: result.rec.id,
-                    amount: result.rec.amount,
-                    date: result.rec.date,
-                    categoryId: result.rec.categoryId,
-                    note: result.rec.note,
-                    merchantName: result.rec.merchant?.name ?? '',
-                    paidBy: result.rec.paidBy,
-                  })
-                }
+                onClick={() => openEntry(draftFromRecord(result.rec))}
               >
                 {SCAN.viewExisting}
               </button>

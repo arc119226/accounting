@@ -66,3 +66,31 @@ export function reconcileInvoiceDuplicates(
   }
   return { next: next ?? records, deduped };
 }
+
+/**
+ * 墓碑復原（「刪掉了——復原」）：整列寫回、`deleted: false`、**換新信封**。
+ *
+ * 信封換新的理由與上面同一條：復原是新事件，LWW 於是天然贏過那個墓碑，
+ * 跨裝置也成立（對方下次同步就把記錄接回去）。沿用舊信封則會被自己的墓碑蓋掉。
+ *
+ * 剝號的情況：刪除當下墓碑已被剝過 invoice，但**這期間可能同步收到對方那張同號的活記錄**。
+ * 此時把號碼寫回去會撞 by-invoice unique index 讓整筆落盤失敗（等於復原鈕壞掉），
+ * 所以偵測到號碼已被別的活記錄佔住就不還原 invoice——身分由 id 保存，items 照留。
+ */
+export function restoreRecord(
+  records: ReadonlyMap<string, ExpenseRecord>,
+  row: ExpenseRecord,
+  envelope: FreshEnvelope,
+): ExpenseRecord {
+  const number = row.invoice?.number;
+  if (number !== undefined) {
+    for (const r of records.values()) {
+      if (r.id !== row.id && !r.deleted && r.invoice?.number === number) {
+        const { invoice: _taken, ...rest } = row;
+        void _taken;
+        return { ...rest, deleted: false, ...envelope };
+      }
+    }
+  }
+  return { ...row, deleted: false, ...envelope };
+}

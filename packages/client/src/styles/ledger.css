@@ -1,15 +1,28 @@
 /* 主帳頁：月份導覽、兩人小計、日分組清單、記一筆 FAB */
 .ledger-body { padding-bottom: 90px; /* FAB 讓位 */ touch-action: pan-y; }
 
+/* 月份與合計分兩列：擠成一列時（19px 毛筆月份＋合計＋兩顆 44px 箭頭）在 360px 機上要 ~349px，
+   只能靠 .screen-body 的 16px 內距硬撐＝箭頭貼死螢幕邊（Android 邊緣返回手勢區），
+   而系統字級一放大就直接爆版——爆了還碰不到，因為 .ledger-body 的 touch-action:pan-y
+   擋掉橫向手勢。拆成兩列後只要 267px，餘裕 61px，再不夠就換行而不是溢出。 */
 .month-nav {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 14px;
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 .month-arrow { font-size: 20px; min-width: 44px; }
-.month-banner { display: flex; align-items: baseline; gap: 10px; }
-.month-total { font-size: 13px; color: var(--scroll-ink-dim); letter-spacing: 0; }
+.month-banner { display: block; }
+.month-total {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 13px;
+  /* 離開卷軸紙面就該用頁面的暗墨，不是紙上墨 */
+  color: var(--dim);
+  letter-spacing: 0;
+}
 
 .person-totals {
   display: grid;
@@ -103,6 +116,7 @@
   border: 1px solid #b08d57;
   color: #6b4c1d;
   border-radius: 10px;
+  min-height: 44px; /* 整條可點，但高度原本只有 42 */
   padding: 10px 14px;
   font-size: 13px;
   text-align: left;
@@ -111,12 +125,16 @@
 }
 .backup-nag:active { filter: brightness(0.96); }
 
-/* 記一筆 FAB：底部導覽上方置中，硃砂印泥感 */
+/* 記一筆 FAB：底部導覽上方置中，硃砂印泥感。
+   absolute 而非 fixed（定位基準是 .screen，它剛好止於導覽列上緣）：
+   fixed 會被 .screen 進場動畫的 transform 捕獲當包含塊，動畫結束再彈回視窗＝每次進帳本跳一下。
+   靜止位置與原本完全相同（原 68+34 safe = 102；導覽列 56+34 = 90；差 12），
+   而且不再依賴 env()——安全區已由 .bottom-nav 自己吃掉。 */
 .add-fab {
-  position: fixed;
+  position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  bottom: 12px;
   z-index: 20;
   padding: 12px 34px;
   border-radius: 24px;

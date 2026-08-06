@@ -15,7 +15,7 @@ import { getDeviceId, getPersonId } from '../ids';
 import { decideIncoming, type ApplyDecision } from '../sync/applyCore';
 import type { SyncHandle } from '../sync/trystero';
 import type { PeerHello, SyncKind, SyncSession, SyncTotals } from '../sync/protocol';
-import { buildExport, downloadExport, parseImport } from '../sync/exportFile';
+import { buildExport, parseImport, shareOrDownloadExport, type ExportOutcome } from '../sync/exportFile';
 import { logError } from '../errlog';
 import { show } from '../notice';
 
@@ -31,11 +31,20 @@ export interface SyncSlice {
   /** 檔案匯入的結果摘要（與 P2P 共用同一張卡） */
   importSummary: SyncTotals | null;
   importFailed: boolean;
+  /**
+   * deep link／掃碼帶進來、**尚未執行**的房間碼。
+   * 開機當下不入房：hydrate 是 async（帳本還沒載完），而且空帳本也可能是
+   * iOS 系統相機開出來的 Safari 分身——入不入房的決策交給 SyncScreen。
+   */
+  pendingJoin: string | null;
   loadPeers(): Promise<void>;
   hostSync(): void;
   joinSync(code: string): void;
+  setPendingJoin(code: string): void;
+  clearPendingJoin(): void;
   cancelSync(): void;
-  exportLedger(): void;
+  /** 回傳去向讓畫面決定文案——store 不組顯示文字 */
+  exportLedger(): Promise<ExportOutcome>;
   importLedger(file: File): Promise<void>;
 }
 
@@ -115,6 +124,12 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
   }
 
   async function begin(role: 'host' | 'join', code: string): Promise<void> {
+    // hydrate 沒完成就入房＝**以空帳本完成一次「成功」的握手**：這台送出 0 列，
+    // 但雙方仍各自存下 checkpoint = min(雙方 hlcNow)，而 hlcNow 取自 tickClock()、
+    // 值已 ≥ 自己每一列的 updatedAt ⇒ 下次對方帶著這個水位過來，changedSince 永遠算出空集合，
+    // **這台的整本帳從此不再增量傳給對方**（靜默，且 lowerPeerCheckpoints 只在收進更舊的列時
+    // 才回撥，救不到）。閘放在這裡＝涵蓋所有入口，不只 deep link 那一條。
+    if (!get().hydrated) return;
     const gen = ++syncGen;
     handle?.cancel();
     handle = null;
@@ -174,6 +189,7 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
     clockDriftMs: null,
     importSummary: null,
     importFailed: false,
+    pendingJoin: null,
 
     async loadPeers() {
       try {
@@ -199,6 +215,14 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
       void begin('join', clean);
     },
 
+    setPendingJoin(code) {
+      set({ pendingJoin: code });
+    },
+
+    clearPendingJoin() {
+      set({ pendingJoin: null });
+    },
+
     cancelSync() {
       syncGen += 1; // 在途 begin 作廢
       handle?.cancel();
@@ -206,9 +230,11 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
       set({ syncSession: null, syncRole: null, roomCode: null });
     },
 
+    // 不加 async：async 會讓整個函式體排進 microtask，而 shareOrDownloadExport 內的
+    // navigator.share() 必須留在 click 的手勢任務內，否則 Safari 丟 NotAllowedError
     exportLedger() {
       const s = get();
-      downloadExport(
+      return shareOrDownloadExport(
         buildExport({
           deviceId: getDeviceId(),
           records: s.records.values(),
@@ -217,8 +243,14 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
           persons: s.persons.values(),
           budget: s.budget,
         }),
-      );
-      s.updateSettings({ lastExportMs: Date.now() });
+      ).then((outcome) => {
+        // 取消/失敗都不推進備份時鐘——推了的話 BackupNag 會被靜默解除，
+        // 使用者從此以為自己備份過了
+        if (outcome === 'shared' || outcome === 'downloaded') {
+          get().updateSettings({ lastExportMs: Date.now() });
+        }
+        return outcome;
+      });
     },
 
     async importLedger(file) {

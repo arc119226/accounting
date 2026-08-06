@@ -1,7 +1,7 @@
 /* 宣紙通知（sr2 app-toast 血統）：底部置中、紙底金框 */
 .app-toast {
   position: fixed;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px)); /* 讓開底部導覽列 */
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px) + var(--kb, 0px)); /* 讓開底部導覽列與軟鍵盤 */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -16,7 +16,12 @@
   z-index: 90;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
   animation: fadein 0.15s ease;
-  white-space: nowrap;
+  /* fixed + translateX(-50%) + nowrap + 無 max-width ⇒ 字串一長就同時溢出兩側，
+     不可捲也不可見。目前最長的字串還撐得住，但這是三行保險。 */
+  max-width: min(92vw, 420px);
+  white-space: normal;
+  /* toast 會報金額（已記一筆 $250），金額一律等寬 */
+  font-variant-numeric: tabular-nums;
 }
 .app-toast-btn {
   border: 1px solid #8a6a3b;

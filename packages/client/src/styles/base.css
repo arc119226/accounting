@@ -17,6 +17,10 @@
    亮宣紙底、深墨字、玉青 accent、暗金 hairline、硃砂強調 */
 :root {
   color-scheme: light;
+  /* 軟鍵盤吃掉的視窗高（src/keyboard.ts 於執行期改寫）。iOS Safari 不縮版面視窗、
+     只縮 visualViewport ⇒ fixed 的抽屜/對話框會被鍵盤蓋住，只能靠這個變數手動讓位；
+     Android 有 interactive-widget=resizes-content 時恆為 0（版面已經縮過了）。 */
+  --kb: 0px;
   --bg: #e7dcc3;
   --bg-grad: radial-gradient(1100px 700px at 50% -10%, #f5eeda 0%, #e7dcc3 60%);
   --card: #f2ead6;
@@ -63,6 +67,10 @@ body {
   display: flex;
   flex-direction: column;
   animation: screenIn 0.28s ease both;
+  /* screenIn 的 transform 會讓 .screen 在那 0.28s 內成為 position:fixed 子孫的包含塊，
+     動畫結束 transform 歸 none 時包含塊又換回視窗——FAB 於是每次進帳本都會瞬移一次。
+     顯式 relative 讓 FAB 改用 absolute 定位在 .screen 上，兩個階段的基準一致。 */
+  position: relative;
 }
 @keyframes screenIn {
   from { opacity: 0; transform: translateY(10px); }

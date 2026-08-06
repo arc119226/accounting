@@ -27,6 +27,9 @@ export const NOTICE = {
   updateReady: '新版本已就緒',
   updateBtn: '重新整理',
   saveFailed: '設定保存失敗——變更僅在本次有效',
+  /** 刪除後接金額，配「復原」動作鈕 */
+  deletedPrefix: '已刪除 ',
+  undo: '復原',
 } as const;
 
 export const CRASH = {
@@ -62,6 +65,9 @@ export const ENTRY = {
   merchantLabel: '店家',
   merchantPlaceholder: '（可留白）',
   save: '入帳',
+  saveEdit: '改一筆',
+  saveAndNext: '入帳再記',
+  repeatToday: '照這筆再記今天',
   delete: '刪除',
   deleteTitle: '刪除這筆？',
   deleteBody: '刪除後會在同步時一併從對方帳上移除。',
@@ -70,6 +76,11 @@ export const ENTRY = {
   dupConfirm: '仍要入帳',
   /** {note} 由呼叫端替換 */
   dupBodyPrefix: '同日已有一筆同額記錄：',
+  /** 入帳/改帳的 toast 前綴，後接金額 */
+  savedNew: '已記一筆 ',
+  savedEdit: '已改一筆 ',
+  /** 掃描來的記錄在帳本內回看（唯讀） */
+  invoiceSection: '發票內容',
 } as const;
 
 export const CATEGORIES = {
@@ -96,6 +107,7 @@ export const SCAN = {
   photoNone: '照片裡沒有讀到發票碼',
   previewTitle: '掃到一張發票',
   existsTitle: '這張發票已在帳上',
+  justSaved: '這張剛記過了——換下一張',
   viewExisting: '查看該筆',
   rescan: '重掃',
   invNoLabel: '發票號碼',
@@ -103,6 +115,13 @@ export const SCAN = {
   itemsLabel: '品項',
   itemsPartial: '（發票僅載部分品項）',
   save: '入帳',
+} as const;
+
+/** 品項自動備註的組字零件（core 只吐 names/total，文案在這裡） */
+export const ITEMNOTE = {
+  sep: '、',
+  etcPrefix: '…等',
+  etcSuffix: '項',
 } as const;
 
 export const RULES = {
@@ -117,6 +136,17 @@ export const SYNC = {
   joinBtn: '加入同步室',
   codeLabel: '房間碼',
   codePlaceholder: '輸入 6 位房間碼',
+  scanJoinBtn: '掃對方的碼',
+  scanHint: '對準對方畫面上的方塊碼',
+  scanStarting: '喚起鏡頭…',
+  scanDenied: '鏡頭無法開啟——改用下面的房間碼',
+  hostQrHint: '請對方在柴米帳裡按「加入同步室 › 掃對方的碼」，或直接念這六碼。',
+  emptyGateTitle: '這個瀏覽器沒有帳本',
+  emptyGateBody:
+    '你可能是用系統相機掃了配對碼，於是 Safari 另開了一個空白的柴米帳。'
+    + '在這裡同步只會把帳複製到這個用完就丟的分頁——請回主畫面開柴米帳，'
+    + '再用 App 內的「掃對方的碼」。若你是在新手機上要還原備份，才選下面那個。',
+  emptyGateForce: '我確定要在這裡同步',
   waiting: '等待另一半的手機加入…',
   exchanging: '同步中…',
   doneTitle: '合併完成',
@@ -145,6 +175,8 @@ export const SYNC = {
   fileDesc: '匯出完整帳本 JSON 檔；匯入時走同一套合併，不會蓋掉較新的記錄。',
   exportBtn: '匯出帳本',
   importBtn: '匯入帳本',
+  exported: '帳本已匯出',
+  exportFailed: '匯出失敗——請再試一次',
   importFailed: '這不是柴米帳的備份檔，或檔案已損毀。',
   backupNag: '已超過 30 天沒有同步或備份——花一分鐘匯出一份吧。',
 } as const;
@@ -163,6 +195,14 @@ export const STATS = {
   personTitle: '兩人比較',
   budgetTitle: '預算',
   emptyRange: '此區間沒有記錄，紙上留白。',
+  summaryTitle: '月結摘要',
+  /** 後接金額與百分比 */
+  vsLastMore: '較上月多花 ',
+  vsLastLess: '較上月少花 ',
+  flat: '與上月持平',
+  noPrevMonth: '上月沒有記錄，無從比較',
+  moversTitle: '變動最大',
+  largestTitle: '本月最大一筆',
   countSuffix: ' 筆',
 } as const;
 

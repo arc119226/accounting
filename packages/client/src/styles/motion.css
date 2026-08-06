@@ -1,0 +1,35 @@
+/* 減少動態偏好（prefers-reduced-motion）——全站唯一的動畫政策點，排在 barrel 最末靠源序取勝。
+   集中成一葉而非散在各檔：這樣才回答得出「每支 @keyframes 都表態了嗎」（test/styles.test.ts 鎖住）。 */
+
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .sheet-overlay,
+  .entry-sheet,
+  .modal-overlay,
+  .app-toast,
+  .bar-anim {
+    animation: none;
+  }
+
+  /* 陷阱：.trend-line / .donut-arc 的「未播放」狀態就是 stroke-dashoffset:1
+     （JSX 給 pathLength=1 歸一），動畫唯一的工作就是把它推到 0。
+     只寫 animation:none 的話趨勢線與環圖會**永久空白**——必須連終值一起補回。 */
+  .trend-line,
+  .donut-arc {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  /* 轉場壓到 1ms 而非 0：留給可能的 transitionend 監聽者 */
+  .primary-btn,
+  .ghost-btn,
+  .seg-btn,
+  .corner-btn,
+  .paper-label,
+  .nav-btn,
+  .fade-img {
+    transition-duration: 1ms;
+  }
+
+  /* .spinner 刻意不列入：凍住的載入指示器等於在說謊，而 14px 的小圓不是前庭刺激源。 */
+}

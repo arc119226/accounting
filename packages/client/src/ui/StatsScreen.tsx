@@ -13,6 +13,7 @@ import {
   formatNTD,
   monthOf,
   monthRange,
+  monthSummary,
   sumByCategory,
   sumByMonth,
   sumByPerson,
@@ -20,7 +21,7 @@ import {
   type ExpenseRecord,
 } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
-import { todayISO } from '../store/ledgerSlice';
+import { draftFromRecord, todayISO } from '../store/ledgerSlice';
 import { matchesPersonFilter, sortPersonsForTabs } from '../personView';
 import { BarChart } from './charts/BarChart';
 import { DonutChart } from './charts/DonutChart';
@@ -32,6 +33,67 @@ import { PersonTabs } from './PersonTabs';
 import { LEDGER, STATS } from '../strings/ui';
 
 type Preset = 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom';
+
+/**
+ * 月結摘要卡（單月區間才出現）：本月 vs 上月、變動最大的三個分類、本月最大一筆。
+ * 漲用硃砂（既有 .over-red）、跌用玉青 --accent——不發明新的綠。
+ */
+function MonthSummaryCard({ rows, month }: { rows: readonly ExpenseRecord[]; month: string }) {
+  const categories = useAppStore((s) => s.categories);
+  const records = useAppStore((s) => s.records);
+  const openEntry = useAppStore((s) => s.openEntry);
+  const s = useMemo(() => monthSummary(rows, month, 3), [rows, month]);
+  const largest = s.largestId === null ? undefined : records.get(s.largestId);
+
+  const deltaLine =
+    s.deltaPct === null ? STATS.noPrevMonth
+    : s.delta === 0 ? STATS.flat
+    : `${s.delta > 0 ? STATS.vsLastMore : STATS.vsLastLess}${formatNTD(Math.abs(s.delta))}（${s.delta > 0 ? '+' : '−'}${Math.abs(s.deltaPct)}%）`;
+
+  return (
+    <div className="paper-card">
+      <div className="chart-title">
+        {STATS.summaryTitle} · {formatMonthZh(month)}
+        <span className="chart-hint dim-text tnum">{formatNTD(s.total)}</span>
+      </div>
+      <p className={`dim-text${s.delta > 0 && s.deltaPct !== null ? ' over-red' : ''}`}>{deltaLine}</p>
+
+      {s.movers.length > 0 && (
+        <>
+          <div className="field-label">{STATS.moversTitle}</div>
+          {s.movers.map((m) => {
+            const cat = categories.get(m.categoryId);
+            return (
+              <div key={m.categoryId} className="cat-row">
+                <CategorySeal glyph={cat?.glyph ?? '雜'} color={cat?.color ?? '#6e6046'} />
+                <span className="cat-name">{cat?.name ?? m.categoryId}</span>
+                <span className={`tnum${m.delta > 0 ? ' over-red' : ' mover-down'}`}>
+                  {m.delta > 0 ? '+' : '−'}
+                  {formatNTD(Math.abs(m.delta))}
+                </span>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {largest && (
+        <>
+          <div className="field-label">{STATS.largestTitle}</div>
+          <button className="entry-row" onClick={() => openEntry(draftFromRecord(largest))}>
+            <span className="entry-text">
+              <span className="entry-title">
+                {largest.merchant?.name || largest.note || categories.get(largest.categoryId)?.name || ''}
+              </span>
+              <span className="entry-sub">{largest.date}</span>
+            </span>
+            <span className="entry-amount tnum">{formatNTD(largest.amount)}</span>
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 function MonthStepper({ value, onChange }: { value: string; onChange: (m: string) => void }) {
   return (
@@ -126,6 +188,8 @@ export function StatsScreen() {
         <p className="dim-text empty-hint">{STATS.emptyRange}</p>
       ) : (
         <>
+          {singleMonth && <MonthSummaryCard rows={rows} month={focusMonth} />}
+
           <div className="paper-card">
             <div className="chart-title">{STATS.barTitle}</div>
             <BarChart
@@ -183,15 +247,7 @@ export function StatsScreen() {
                     key={r.id}
                     className="entry-row"
                     onClick={() =>
-                      openEntry({
-                        editingId: r.id,
-                        amount: r.amount,
-                        date: r.date,
-                        categoryId: r.categoryId,
-                        note: r.note,
-                        merchantName: r.merchant?.name ?? '',
-                        paidBy: r.paidBy,
-                      })
+                      openEntry(draftFromRecord(r))
                     }
                   >
                     <span className="entry-text">

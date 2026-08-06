@@ -28,6 +28,7 @@ export {
   isValidISODate,
   monthOf,
   monthRange,
+  monthsBetween,
   rocToISO,
   type DateRange,
 } from './rocdate';
@@ -48,15 +49,24 @@ export {
 } from './merge';
 export {
   dailyTrend,
+  monthSummary,
   sumByCategory,
   sumByMonth,
   sumByPerson,
+  type CategoryDelta,
   type CategoryTotal,
   type DayPoint,
+  type MonthSummary,
   type MonthTotal,
 } from './stats';
 export { budgetProgress, type BudgetLine, type BudgetProgress } from './budget';
-export { reconcileInvoiceDuplicates, type FreshEnvelope, type ReconcileResult } from './reconcile';
+export { digestItems, suggestNotes, type ItemDigest, type NoteSuggestion } from './notes';
+export {
+  reconcileInvoiceDuplicates,
+  restoreRecord,
+  type FreshEnvelope,
+  type ReconcileResult,
+} from './reconcile';
 export {
   looksLikeEInvoiceLeft,
   looksLikeEInvoiceRight,
