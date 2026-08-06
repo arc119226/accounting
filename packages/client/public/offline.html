@@ -1,0 +1,67 @@
+<!doctype html>
+<!-- 離線殼頁（M5 sw.js 唯一預快取的檔，離線時的 navigation 回退）。
+     刻意在 strings 系統之外（SW 靜態檔搆不到 bundle）。
+     改這個檔必須 bump sw.js 的 CACHE 版本，否則已裝機的舊殼頁不會更新。 -->
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#e7dcc3" />
+    <title>柴米帳 — 離線</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #e7dcc3;
+        color: #2a2118;
+        font-family: 'Noto Serif TC', 'PMingLiU', serif;
+        display: grid;
+        place-items: center;
+        text-align: center;
+      }
+      h1 {
+        font-size: 30px;
+        letter-spacing: 0.35em;
+        margin: 0 0 14px;
+        font-weight: 600;
+        text-indent: 0.35em; /* 平衡 letter-spacing 的尾空 */
+      }
+      p {
+        margin: 0 0 26px;
+        opacity: 0.72;
+        font-size: 15px;
+        line-height: 1.9;
+      }
+      small {
+        font-size: 12px;
+        opacity: 0.55;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 1px solid #9c7c40;
+        border-radius: 8px;
+        padding: 10px 30px;
+        letter-spacing: 0.25em;
+        text-indent: 0.25em;
+        cursor: pointer;
+      }
+      button:active {
+        background: #dccaa0;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <h1>斷線</h1>
+      <p>
+        網路不通，帳本暫歇。<br />
+        連上網路後，再回來記帳。<br />
+        <small>You are offline — reconnect to continue.</small>
+      </p>
+      <button onclick="location.reload()">重試</button>
+    </div>
+  </body>
+</html>

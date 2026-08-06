@@ -1,0 +1,13 @@
+# 快取策略（移植自 sr2；Cloudflare Workers assets 原生讀取 build output 內的此檔）。
+# immutable 只准打 /assets/*（檔名帶 hash=內容不變）；
+# fonts 是「同名替換」檔，誤上 immutable 會讓換字體一年不生效——短新鮮窗 + SWR。
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/version.json
+  Cache-Control: no-store
+/fonts/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+# PWA 殼（M5）：SW 主檔要立即更新；offline.html 由 SW 預快取
+/sw.js
+  Cache-Control: no-cache

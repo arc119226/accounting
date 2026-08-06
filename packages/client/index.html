@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>柴米帳</title>
+    <meta name="description" content="柴米帳——兩個人的宣紙記帳本。掃發票、記日常，面對面同步。" />
+    <meta name="theme-color" content="#e7dcc3" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="preload" as="font" href="/fonts/zb-brush.woff2" type="font/woff2" crossorigin />
+    <style>
+      /* 根層永不捲動（各 screen 自管內部捲軸）；dvh 追蹤行動瀏覽器工具列顯隱 */
+      html, body, #root { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+      html { height: 100vh; height: 100dvh; }
+      /* styles.css（main.tsx 才載）前的底色：與 :root 紙色一致，避免白閃 */
+      body { background: #e7dcc3; color: #2a2118; font-family: system-ui, 'PingFang TC', 'Microsoft JhengHei', sans-serif; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

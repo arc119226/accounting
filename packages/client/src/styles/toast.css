@@ -1,0 +1,29 @@
+/* 宣紙通知（sr2 app-toast 血統）：底部置中、紙底金框 */
+.app-toast {
+  position: fixed;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px)); /* 讓開底部導覽列 */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #efe6d2f2;
+  border: 1px solid #b08d57;
+  color: #2c2318;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 90;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  animation: fadein 0.15s ease;
+  white-space: nowrap;
+}
+.app-toast-btn {
+  border: 1px solid #8a6a3b;
+  background: #d9b96e;
+  color: #241a0d;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}

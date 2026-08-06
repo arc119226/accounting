@@ -1,0 +1,11 @@
+{
+  "name": "柴米帳",
+  "short_name": "柴米帳",
+  "description": "兩個人的宣紙記帳本。掃發票、記日常，面對面同步。",
+  "lang": "zh-Hant",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#e7dcc3",
+  "theme_color": "#e7dcc3",
+  "icons": []
+}
