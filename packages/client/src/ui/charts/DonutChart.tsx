@@ -1,8 +1,14 @@
 /**
- * 分類環圖：分類色壓彩後的圓弧 + 中心毛筆字總額。
- * 弧以 stroke 繪（fill none）——stroke-dasharray 天生支援「筆畫自己畫出來」動畫。
+ * 分類環圖：分類色壓彩後的圓弧。弧以 stroke 繪（fill none）——stroke-dasharray
+ * 天生支援「筆畫自己畫出來」動畫。
+ *
+ * **總額不畫在環心**：SVG 內的 <text> 用的是固定的 viewBox user unit，而 CSS font-size
+ * 會被系統字級乘大——兩種可能都會壞（不乘＝那行字永遠不會為視力不好的人長大；
+ * 乘＝壓到環上、再大則被 SVG root 預設的 overflow:hidden 左右對稱切掉）。
+ * 改由呼叫端放進卡片標題列的 .chart-hint（真正的 HTML 文字，會換行、可選取、
+ * 螢幕閱讀器唸得到）。環心留白在宣紙語彙裡站得住。
  */
-import { formatNTD, type CategoryTotal } from '@zhangben/core';
+import { type CategoryTotal } from '@zhangben/core';
 import { pressColor } from './InkDefs';
 
 const SIZE = 220;
@@ -25,11 +31,9 @@ function arcPath(startFrac: number, endFrac: number): string {
 export function DonutChart({
   data,
   colors,
-  total,
 }: {
   data: readonly CategoryTotal[];
   colors: ReadonlyMap<string, string>;
-  total: number;
 }) {
   let acc = 0;
   const sum = Math.max(1, data.reduce((s, d) => s + d.total, 0));
@@ -58,12 +62,6 @@ export function DonutChart({
           );
         })}
       </g>
-      <text x={C} y={C - 4} textAnchor="middle" className="donut-total-label">
-        合計
-      </text>
-      <text x={C} y={C + 22} textAnchor="middle" className="donut-total tnum">
-        {formatNTD(total)}
-      </text>
     </svg>
   );
 }

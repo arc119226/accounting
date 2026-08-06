@@ -1,7 +1,9 @@
 /* 宣紙通知（sr2 app-toast 血統）：底部置中、紙底金框 */
 .app-toast {
   position: fixed;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px) + var(--kb, 0px)); /* 讓開底部導覽列與軟鍵盤 */
+  /* 讓開底部導覽列與軟鍵盤。76 = 導覽列 56 + 20 餘裕，但導覽列高是
+     max(56px, 字級撐出來的高) ⇒ 大字級時 76 不夠，toast 會壓在導覽列上。 */
+  bottom: calc(max(76px, 2.6em + 20px) + env(safe-area-inset-bottom, 0px) + var(--kb, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -23,6 +25,22 @@
   /* toast 會報金額（已記一筆 $250），金額一律等寬 */
   font-variant-numeric: tabular-nums;
 }
+/* 帳本頁的「記一筆」FAB 與 toast 同在底部中軸線上：FAB 佔 68→114（導覽列 56 + 12 間距 + 高 46），
+   toast 從 76 起算 ⇒ 整顆鈕被蓋住。復原 toast 自己還帶一顆 44px 的動作鈕、高 62，蓋得更透——
+   於是「刪錯了要按復原」的那 5 秒，底下的 FAB 也一起失效。
+   140 = 導覽列 56 + 間距 12 + FAB 62（≈150% 字級時的高）+ 10 呼吸。 */
+.app-toast.above-fab {
+  bottom: calc(max(140px, 5.6em + 32px) + env(safe-area-inset-bottom, 0px) + var(--kb, 0px));
+}
+
+/* 抽屜開著時底部整片都是抽屜（88dvh，鍵盤開著時貼在鍵盤上緣）——任何底部座標都會壓到
+   入帳鈕或數字鍵盤，而「入帳再記」正是抽屜不關卻會發 toast 的路徑，每按一次必中。
+   改貼頂：上面只有標題列，而且抽屜的 scrim 本來就把它壓暗了。 */
+.app-toast.at-top {
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+}
+
 .app-toast-btn {
   border: 1px solid #8a6a3b;
   background: #d9b96e;

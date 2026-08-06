@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { formatNTD, monthOf, sortCategories, suggestNotes } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
 import { getPersonId } from '../ids';
+import { catTagName } from '../catTag';
 import { sortPersonsForTabs } from '../personView';
 import { findDuplicate, todayISO, type EntryValues } from '../store/ledgerSlice';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -104,13 +105,30 @@ export function EntrySheet() {
   return (
     <div className="sheet-overlay" onClick={closeEntry}>
       <div className="entry-sheet" onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-title">
-          <span className="seal-char">{title.slice(0, 1)}</span>
-          {title.slice(1)}
+        {/* 三段式：頭（標題＋金額）與尾（入帳鈕）**移出捲動區**，中段才捲。
+            這樣「金額」與「入帳」在任何字級、任何視窗高、鍵盤開著時都不會被推出視野，
+            也不必動用 position:sticky——sticky 的貼齊點是 scrollport(padding box)、
+            約束框卻是包含塊(content box)，差一個內距要靠負邊距硬湊，而且 .paper-label
+            是 position:relative + z-index:auto，同層依 tree order 決勝 ⇒ 分類籤條會畫在
+            釘頂的金額上面。骨架語彙沿用 .screen / .scan-body。 */}
+        <div className="sheet-head">
+          <div className="sheet-head-row">
+            <div className="sheet-title">
+              <span className="seal-char">{title.slice(0, 1)}</span>
+              {title.slice(1)}
+            </div>
+            {/* 刪除移出按鈕列：它是抽屜裡唯一不可逆的操作，卻在三顆並排時逼「再記今天」斷行。
+                44×44 的硃砂印章鈕在任何字級都是同一個尺寸，對版面零壓力（仍有確認框把關）。 */}
+            {editing && (
+              <button className="corner-btn" aria-label={ENTRY.delete} onClick={() => setConfirm('delete')}>
+                <span className="corner-seal">{ENTRY.deleteGlyph}</span>
+              </button>
+            )}
+          </div>
+          <div className="amount-display tnum">{amount === null ? '$0' : formatNTD(amount)}</div>
         </div>
 
-        <div className="amount-display tnum">{amount === null ? '$0' : formatNTD(amount)}</div>
-
+        <div className="sheet-scroll">
         {/* 日期獨立成整幅一列：擠在 .entry-grid 的 4fr 欄裡時三顆按鈕各只有 42px、
             內容盒 28px，而「選日期」三個字就要 42px ⇒ 必斷行。要不斷行得視窗 ≥451px，
             比現役最大的手機還寬（iPhone 16 Pro Max 是 440px）——這不是窄機 bug，是全中。
@@ -205,10 +223,14 @@ export function EntrySheet() {
             <button
               key={c.id}
               className={`paper-label${categoryId === c.id ? ' active' : ''}`}
+              // 籤條上只印前 4 字（直書 nowrap 的不換行方向是**高度**、沒有上限），
+              // 完整名字靠 aria-label/title 帶回來
+              aria-label={`${c.glyph}${c.name}`}
+              title={c.name}
               onClick={() => setCategoryId(c.id)}
             >
               {c.glyph}
-              {c.name}
+              {catTagName(c.name)}
             </button>
           ))}
         </div>
@@ -236,17 +258,18 @@ export function EntrySheet() {
             ))}
           </details>
         )}
+        </div>
 
-        <div className="modal-actions sheet-actions">
-          {editing ? (
-            <>
-              <button className="danger-btn" onClick={() => setConfirm('delete')}>
-                {ENTRY.delete}
-              </button>
-              {/* 照這筆再記今天：同樣的店同樣的錢，換個日期再記一次（每週買菜、每天停車）。
-                  payload 用**當下的本地 state**而非原記錄——使用者可能先改了金額才決定要再記一筆。
-                  必須同時 setDate：App.tsx 的 key 是 render 期間的未訂閱 getState() 讀取，
-                  重掛與不重掛兩條路都可能發生，兩條都得成立。 */}
+        {/* 尾段。**不掛 .modal-actions**：barrel 順序是 entry.css(3) → dialogs.css(7)，
+            同特異性下後者勝 ⇒ .modal-actions 會蓋掉 .sheet-actions 的任何 display/justify-content
+            （v3 寫的 justify-content:space-between 從來沒生效過）。 */}
+        <div className="sheet-foot">
+          <div className="sheet-actions">
+            {editing ? (
+              /* 照這筆再記今天：同樣的店同樣的錢，換個日期再記一次（每週買菜、每天停車）。
+                 payload 用**當下的本地 state**而非原記錄——使用者可能先改了金額才決定要再記一筆。
+                 必須同時 setDate：App.tsx 的 key 是 render 期間的未訂閱 getState() 讀取，
+                 重掛與不重掛兩條路都可能發生，兩條都得成立。 */
               <button
                 className="ghost-btn"
                 onClick={() => {
@@ -257,16 +280,16 @@ export function EntrySheet() {
               >
                 {ENTRY.repeatToday}
               </button>
-            </>
-          ) : (
-            // 入帳再記：存完不關抽屜，保留日期/分類/人。單筆記帳仍走右邊那顆＝零額外點擊
-            <button className="ghost-btn" disabled={!amount} onClick={() => trySave(true)}>
-              {ENTRY.saveAndNext}
+            ) : (
+              // 入帳再記：存完不關抽屜，保留日期/分類/人。單筆記帳仍走右邊那顆＝零額外點擊
+              <button className="ghost-btn" disabled={!amount} onClick={() => trySave(true)}>
+                {ENTRY.saveAndNext}
+              </button>
+            )}
+            <button className="primary-btn" disabled={!amount} onClick={() => trySave()}>
+              {editing ? ENTRY.saveEdit : ENTRY.save}
             </button>
-          )}
-          <button className="primary-btn save-btn" disabled={!amount} onClick={() => trySave()}>
-            {editing ? ENTRY.saveEdit : ENTRY.save}
-          </button>
+          </div>
         </div>
 
         {/* 確認框必須在 .entry-sheet（有 stopPropagation）內：

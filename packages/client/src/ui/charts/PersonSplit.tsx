@@ -27,7 +27,7 @@ function TugOfWar({ a, b }: { a: SplitPerson; b: SplitPerson }) {
           <span className="tnum">{formatNTD(b.total)}</span> {b.name}
         </span>
       </div>
-      <svg viewBox="0 0 360 22" className="chart-svg split-bar" role="img" aria-label="兩人支出比例">
+      <svg viewBox="0 0 360 22" className="chart-svg" role="img" aria-label="兩人支出比例">
         <g filter="url(#ink-bleed-heavy)">
           <rect x="2" y="4" width={356 * fracA} height="14" rx="3" fill={COLORS[0]} opacity="0.85" />
           <rect x={2 + 356 * fracA} y="4" width={356 * (1 - fracA)} height="14" rx="3" fill={COLORS[1]} opacity="0.8" />
@@ -49,14 +49,20 @@ export function PersonSplit({ persons }: { persons: readonly SplitPerson[] }) {
   return (
     <div className="person-split">
       {persons.map((p, i) => (
-        <div key={p.id} className="split-row">
-          <span className="split-name">{p.name}</span>
-          <svg viewBox="0 0 260 16" className="chart-svg split-bar" role="img" aria-label={`${p.name} 支出`}>
+        /* 沿用預算分類列的版式（.budget-cat-line + .budget-head）：姓名與金額一列
+           space-between、長條滿寬另一列。原本用的 .split-row/.split-name/.split-amount
+           **全庫 CSS 都沒有定義**，於是 svg 的 display:block 把三者拆成三行堆疊；
+           而三欄式（姓名｜長條｜金額）在大字級下本來就會擠爆。 */
+        <div key={p.id} className="budget-cat-line">
+          <div className="budget-head">
+            <span>{p.name}</span>
+            <span className="tnum">{formatNTD(p.total)}</span>
+          </div>
+          <svg viewBox="0 0 360 16" className="chart-svg" role="img" aria-label={`${p.name} 支出`}>
             <g filter="url(#ink-bleed-heavy)">
-              <rect x="1" y="3" width={Math.max(2, (258 * p.total) / max)} height="10" rx="3" fill={COLORS[i % COLORS.length]} opacity="0.85" />
+              <rect x="1" y="3" width={Math.max(2, (358 * p.total) / max)} height="10" rx="3" fill={COLORS[i % COLORS.length]} opacity="0.85" />
             </g>
           </svg>
-          <span className="tnum split-amount">{formatNTD(p.total)}</span>
         </div>
       ))}
     </div>

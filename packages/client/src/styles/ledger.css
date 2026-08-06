@@ -1,5 +1,8 @@
 /* 主帳頁：月份導覽、兩人小計、日分組清單、記一筆 FAB */
-.ledger-body { padding-bottom: 90px; /* FAB 讓位 */ touch-action: pan-y; }
+/* FAB 讓位。90px 是 100% 字級量出來的：FAB 高 = 24 內距 + 1.6em 行盒，
+   字級 200% 時 FAB 變 74px 高 + 12px 底距，90 就不夠了 ⇒ 最後一筆記錄被 FAB 蓋住。
+   讓位距離必須跟著 FAB 一起長。 */
+.ledger-body { padding-bottom: max(90px, calc(1.6em + 44px)); touch-action: pan-y; }
 
 /* 月份與合計分兩列：擠成一列時（19px 毛筆月份＋合計＋兩顆 44px 箭頭）在 360px 機上要 ~349px，
    只能靠 .screen-body 的 16px 內距硬撐＝箭頭貼死螢幕邊（Android 邊緣返回手勢區），
@@ -11,10 +14,14 @@
   justify-content: center;
   gap: 14px;
   flex-wrap: wrap;
-  row-gap: 4px;
+  /* 10 不是 4：4 剛好等於 .scroll-banner 木軸 ::before/::after 的 top/bottom:-4px，
+     木軸底緣與第二列頂緣零間隙相接，字級一放大就疊在一起 */
+  row-gap: 10px;
 }
-.month-arrow { font-size: 20px; min-width: 44px; }
-.month-banner { display: block; }
+.month-arrow { font-size: 20px; min-width: max(44px, 2.75em); }
+/* nowrap（來自 .scroll-banner）在大字級下會讓月份字畫到卷軸紙面外。
+   允許橫幅內部換行，兩顆箭頭就永遠留在同一列，木軸也跟著長高。 */
+.month-banner { display: block; white-space: normal; text-align: center; }
 .month-total {
   flex-basis: 100%;
   text-align: center;
@@ -24,11 +31,15 @@
   letter-spacing: 0;
 }
 
+/* grid 的 1fr = minmax(auto,1fr)，而 auto 的下限是 min-content；金額沒有任何斷行機會
+   ⇒ 字級一放大就把軌道撐破、整列橫向溢出，偏偏 .ledger-body 的 touch-action:pan-y
+   讓人連捲過去看都不行。flex-wrap 讓「換不換行」由內容自己決定，不需要寫死的斷點。 */
 .person-totals {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
+.person-card { flex: 1 1 40%; }
 .person-card .money-amount { text-align: right; }
 
 .day-group {
@@ -38,10 +49,16 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: inset 0 1px 0 #fff7e2aa;
-  overflow: hidden;
+  /* clip 不是 hidden：兩者裁切效果相同（都裁到 border-radius 的內圓角），
+     但 hidden 會讓這張卡變成**捲動容器** ⇒ min-height:auto 解析為 0 ⇒ 在 .screen-body
+     的直向 flex 裡被壓扁到只剩日期標題，而且壓完剛好不溢出＝連捲軸都沒有。
+     clip 不建立捲動容器（flexbox §4.5 的豁免只給 scroll container），min-height:auto
+     仍是內容高。舊 Safari 不支援時退化成 visible＝首末列露出直角，**不會退回壓扁**。 */
+  overflow: clip;
 }
 .day-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: baseline;
   padding: 8px 14px 6px;
@@ -54,6 +71,7 @@
 .entry-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 10px 14px;
   background: transparent;
@@ -63,7 +81,7 @@
   text-align: left;
   font: inherit;
   color: inherit;
-  min-height: 48px;
+  min-height: max(48px, 3em);
 }
 .entry-row:last-child { border-bottom: none; }
 .entry-row:active { background: var(--press-veil); }
@@ -96,17 +114,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 「電」標記從 .entry-title 內搬出來當 .entry-row 的獨立欄：留在標題裡時它跟標題文字走
+   同一條 inline 流，標題一長就連標記一起被 ellipsis 吃掉——而「這筆是掃發票來的」正是
+   長標題那筆最需要的資訊。當 flex item 就不再參與省略。 */
 .einv-chip {
-  display: inline-block;
-  margin-left: 6px;
+  flex-shrink: 0;
+  align-self: center;
   font-size: 10px;
   color: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 3px;
   padding: 0 3px;
-  vertical-align: 1px;
 }
-.entry-amount { font-size: 16px; font-weight: 600; flex-shrink: 0; }
+.entry-amount { font-size: 16px; font-weight: 600; flex-shrink: 0; margin-left: auto; }
 
 .empty-hint { text-align: center; margin-top: 40px; letter-spacing: 0.1em; }
 
@@ -116,7 +136,7 @@
   border: 1px solid #b08d57;
   color: #6b4c1d;
   border-radius: 10px;
-  min-height: 44px; /* 整條可點，但高度原本只有 42 */
+  min-height: max(44px, 2.75em); /* 整條可點，但高度原本只有 42 */
   padding: 10px 14px;
   font-size: 13px;
   text-align: left;

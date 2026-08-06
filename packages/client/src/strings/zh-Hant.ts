@@ -67,8 +67,11 @@ export const ENTRY = {
   save: '入帳',
   saveEdit: '改一筆',
   saveAndNext: '入帳再記',
-  repeatToday: '照這筆再記今天',
+  /** 原「照這筆再記今天」7 字：與刪除鈕並排時吃掉 138px，大字級下必斷行 */
+  repeatToday: '再記今天',
   delete: '刪除',
+  /** 標題列的硃砂印章刪除鈕；aria-label 仍用 ENTRY.delete 的全名 */
+  deleteGlyph: '刪',
   deleteTitle: '刪除這筆？',
   deleteBody: '刪除後會在同步時一併從對方帳上移除。',
   deleteConfirm: '刪除',

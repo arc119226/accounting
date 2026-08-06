@@ -2,7 +2,7 @@
  * 月度長條（近 12 個月）：墨色長條、焦點月鎏金；點長條跳主帳頁該月。
  * 進場動畫：scaleY 由 0 展開、逐條 stagger（CSS 在 stats.css .bar-anim）。
  */
-import { formatAmount, type MonthTotal } from '@zhangben/core';
+import { type MonthTotal } from '@zhangben/core';
 
 const W = 360;
 const H = 150;
@@ -45,18 +45,15 @@ export function BarChart({
                 filter="url(#ink-bleed)"
               />
             )}
-            {focus && d.total > 0 && (
-              <text x={x + bw / 2} y={H - PAD_B - h - 5} textAnchor="middle" className="chart-value tnum">
-                {formatAmount(d.total)}
-              </text>
-            )}
             <text
               x={x + bw / 2}
               y={H - 8}
               textAnchor="middle"
               className={`chart-tick${focus ? ' focus' : ''}`}
             >
-              {m}月
+              {/* 只印數字不印「月」：每格只有 29 user unit，而 SVG 文字若被系統字級乘大，
+                  「12月」在 146% 就會與鄰月刻度重疊。單位由卡片標題一次交代。 */}
+              {m}
             </text>
           </g>
         );

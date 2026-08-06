@@ -17,8 +17,10 @@
 .room-code {
   font-family: var(--font-brush);
   font-size: 34px;
-  letter-spacing: 0.35em;
-  text-indent: 0.35em; /* 平衡尾空 */
+  /* 0.35em × 6 碼在 360px 機上就吃掉 71px，字級略放大即溢出——六碼是要念給對方聽的，
+     斷行讀起來會漏碼。收到 0.2em 換回約 31px 餘裕。 */
+  letter-spacing: 0.2em;
+  text-indent: 0.2em; /* 平衡尾空 */
   color: var(--scroll-ink);
 }
 .room-code-input {
@@ -36,13 +38,6 @@
   margin: 0;
   flex: 0 0 auto;
 }
-.join-cancel {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  background: #efe6d2e6;
-}
-
 .sync-status { margin: 0; letter-spacing: 0.08em; }
 .sync-err { margin: 0; font-size: 14px; }
 

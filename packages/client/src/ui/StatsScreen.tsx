@@ -191,7 +191,12 @@ export function StatsScreen() {
           {singleMonth && <MonthSummaryCard rows={rows} month={focusMonth} />}
 
           <div className="paper-card">
-            <div className="chart-title">{STATS.barTitle}</div>
+            <div className="chart-title">
+              {STATS.barTitle}
+              <span className="chart-hint dim-text tnum">
+                {formatMonthZh(focusMonth)} {formatNTD(byMonth.find((m) => m.month === focusMonth)?.total ?? 0)}
+              </span>
+            </div>
             <BarChart
               data={byMonth}
               focusMonth={focusMonth}
@@ -216,8 +221,13 @@ export function StatsScreen() {
           )}
 
           <div className="paper-card">
-            <div className="chart-title">{STATS.donutTitle}</div>
-            <DonutChart data={byCat} colors={colorMap} total={rangeTotal} />
+            <div className="chart-title">
+              {STATS.donutTitle}
+              {/* 總額從環心搬到這裡：SVG 內的 <text> 是固定 user unit，字級一放大就壓到環上、
+                  再大被 SVG 邊界靜默切掉；HTML 文字則會跟著長大也會換行 */}
+              <span className="chart-hint dim-text tnum">{formatNTD(rangeTotal)}</span>
+            </div>
+            <DonutChart data={byCat} colors={colorMap} />
             <div className="donut-legend">
               {byCat.map((c) => {
                 const cat = categories.get(c.categoryId);
@@ -251,12 +261,10 @@ export function StatsScreen() {
                     }
                   >
                     <span className="entry-text">
-                      <span className="entry-title">
-                        {r.merchant?.name || r.note || ''}
-                        {r.source === 'einvoice' && <span className="einv-chip">{LEDGER.einvoiceChip}</span>}
-                      </span>
+                      <span className="entry-title">{r.merchant?.name || r.note || ''}</span>
                       <span className="entry-sub">{r.date}</span>
                     </span>
+                    {r.source === 'einvoice' && <span className="einv-chip">{LEDGER.einvoiceChip}</span>}
                     <span className="entry-amount tnum">{formatNTD(r.amount)}</span>
                   </button>
                 ))}
@@ -267,7 +275,10 @@ export function StatsScreen() {
           <div className="paper-card">
             <div className="chart-title">
               {STATS.trendTitle} · {formatMonthZh(focusMonth)}
-              <span className="chart-hint dim-text">{STATS.trendHint}</span>
+              {/* 累計終值從 SVG 右上角搬到這裡（同環圖的理由） */}
+              <span className="chart-hint dim-text tnum">
+                {formatNTD(trend.at(-1)?.cumulative ?? 0)} · {STATS.trendHint}
+              </span>
             </div>
             <LineChart current={trend} previous={trendPrev} />
           </div>
