@@ -4,6 +4,7 @@ import { ErrorBoundary } from './ui/ErrorBoundary';
 import { initErrorLog } from './errlog';
 import { APP_VERSION, initUpdateCheck } from './version';
 import { setSaveErrorHandler } from './storage';
+import { initKeyboardInsets } from './keyboard';
 import { show } from './notice';
 import { useAppStore } from './store/appStore';
 import { parseSyncLink } from './sync/deepLink';
@@ -13,6 +14,8 @@ import './styles.css';
 initErrorLog(APP_VERSION);
 // 更新偵測（DEV 早退）：visibilitychange + 10 分鐘輪詢 version.json
 initUpdateCheck();
+// 軟鍵盤讓位：量 visualViewport 寫 --kb（iOS 專用；Android 靠 viewport meta 自己縮）
+initKeyboardInsets();
 // 設定寫失敗=session 內提示一次（saveJson 原契約靜默不變，只多掛通知）
 let saveErrNotified = false;
 setSaveErrorHandler(() => {

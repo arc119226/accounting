@@ -103,7 +103,7 @@
   flex-wrap: wrap;
 }
 .month-stepper { display: inline-flex; align-items: center; gap: 4px; }
-.stepper-btn { min-width: 36px; padding: 4px 8px; }
+.stepper-btn { min-width: 44px; padding: 4px 8px; }
 
 /* 預算設定（設定頁） */
 .budget-input-row {

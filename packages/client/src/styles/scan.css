@@ -12,7 +12,8 @@
   min-height: 0;
   background: #14100a; /* 相機起流前的墨底（不是紙色：取景器語境） */
   border-radius: 12px;
-  margin: 0 12px;
+  /* .scan-body 不是 .screen-body，拿不到 nav.css 的安全區內距——橫放時瀏海會壓到取景器 */
+  margin: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
   overflow: hidden;
 }
 .scan-video {

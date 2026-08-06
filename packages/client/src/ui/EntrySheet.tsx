@@ -91,6 +91,41 @@ export function EntrySheet() {
 
         <div className="amount-display tnum">{amount === null ? '$0' : formatNTD(amount)}</div>
 
+        {/* 日期獨立成整幅一列：擠在 .entry-grid 的 4fr 欄裡時三顆按鈕各只有 42px、
+            內容盒 28px，而「選日期」三個字就要 42px ⇒ 必斷行。要不斷行得視窗 ≥451px，
+            比現役最大的手機還寬（iPhone 16 Pro Max 是 440px）——這不是窄機 bug，是全中。
+            滿寬後每顆 105px、內容盒 91px，放大系統字級也還有 2 倍餘裕。 */}
+        <label className="field-label">{ENTRY.dateLabel}</label>
+        <div className="seg">
+          <button
+            className={`seg-btn${date === todayISO() ? ' active' : ''}`}
+            onClick={() => { setDate(todayISO()); setShowDatePick(false); }}
+          >
+            {ENTRY.today}
+          </button>
+          <button
+            className={`seg-btn${date === yesterdayISO() ? ' active' : ''}`}
+            onClick={() => { setDate(yesterdayISO()); setShowDatePick(false); }}
+          >
+            {ENTRY.yesterday}
+          </button>
+          <button
+            className={`seg-btn${date !== todayISO() && date !== yesterdayISO() ? ' active' : ''}`}
+            onClick={() => setShowDatePick(true)}
+          >
+            {showDatePick || (date !== todayISO() && date !== yesterdayISO()) ? date.slice(5).replace('-', '/') : ENTRY.pickDate}
+          </button>
+        </div>
+        {showDatePick && (
+          <input
+            type="date"
+            className="text-input"
+            value={date}
+            max={todayISO()}
+            onChange={(e) => e.target.value && setDate(e.target.value)}
+          />
+        )}
+
         <div className="entry-grid">
           <div className="keypad">
             {KEYPAD.map((k) => (
@@ -109,37 +144,6 @@ export function EntrySheet() {
                 </button>
               ))}
             </div>
-
-            <label className="field-label">{ENTRY.dateLabel}</label>
-            <div className="seg">
-              <button
-                className={`seg-btn${date === todayISO() ? ' active' : ''}`}
-                onClick={() => { setDate(todayISO()); setShowDatePick(false); }}
-              >
-                {ENTRY.today}
-              </button>
-              <button
-                className={`seg-btn${date === yesterdayISO() ? ' active' : ''}`}
-                onClick={() => { setDate(yesterdayISO()); setShowDatePick(false); }}
-              >
-                {ENTRY.yesterday}
-              </button>
-              <button
-                className={`seg-btn${date !== todayISO() && date !== yesterdayISO() ? ' active' : ''}`}
-                onClick={() => setShowDatePick(true)}
-              >
-                {showDatePick || (date !== todayISO() && date !== yesterdayISO()) ? date.slice(5).replace('-', '/') : ENTRY.pickDate}
-              </button>
-            </div>
-            {showDatePick && (
-              <input
-                type="date"
-                className="text-input"
-                value={date}
-                max={todayISO()}
-                onChange={(e) => e.target.value && setDate(e.target.value)}
-              />
-            )}
 
             <label className="field-label">{ENTRY.noteLabel}</label>
             <input

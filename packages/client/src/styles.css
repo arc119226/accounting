@@ -1,6 +1,7 @@
 /* 樣式匯總 barrel——**只准 @import，順序即契約**（test/styles.test.ts 鎖死）。
    base 首位：reset / @font-face / :root tokens 必須先於一切。
-   components 定義共用元件；dialogs/toast/nav 的覆蓋一律晚於 components。 */
+   components 定義共用元件；dialogs/toast/nav 的覆蓋一律晚於 components。
+   motion 末位：減少動態政策要蓋掉所有人的 animation/transition，且不用 !important。 */
 @import './styles/base.css';
 @import './styles/components.css';
 @import './styles/ledger.css';
@@ -11,3 +12,4 @@
 @import './styles/dialogs.css';
 @import './styles/toast.css';
 @import './styles/nav.css';
+@import './styles/motion.css';

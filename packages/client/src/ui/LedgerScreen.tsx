@@ -147,13 +147,13 @@ export function LedgerScreen() {
         <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, -1))}>
           ‹
         </button>
-        <div className="scroll-banner month-banner">
-          {formatMonthZh(monthCursor)}
-          <span className="month-total tnum">{LEDGER.totalPrefix}{formatNTD(monthTotal)}</span>
-        </div>
+        <div className="scroll-banner month-banner">{formatMonthZh(monthCursor)}</div>
         <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, 1))}>
           ›
         </button>
+        {/* 合計獨立成第二列（見 ledger.css）：卷軸橫幅是標題不是資料列，
+            擠在一起會把兩顆箭頭推到貼死螢幕邊 */}
+        <span className="month-total tnum">{LEDGER.totalPrefix}{formatNTD(monthTotal)}</span>
       </div>
 
       <PersonTabs />

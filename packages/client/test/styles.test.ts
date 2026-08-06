@@ -33,7 +33,24 @@ const AFTER: readonly (readonly [string, string, string])[] = [
   ['dialogs.css', 'components.css', 'modal 內按鈕間距/覆蓋晚於元件定義'],
   ['toast.css', 'components.css', 'toast 內按鈕樣式晚於元件定義'],
   ['nav.css', 'components.css', 'nav 的 .screen 版面補充晚於元件定義'],
+  ['motion.css', 'base.css', 'reduce 時關 .screen 的 screenIn 與 .fade-img 轉場，須晚於 base 的動畫宣告'],
+  ['motion.css', 'components.css', '.paper-label/.nav-btn 的 transition 覆蓋晚於元件定義'],
+  ['motion.css', 'entry.css', '關 .entry-sheet 的 sheetUp 上滑（30% 位移是前庭刺激源）'],
+  ['motion.css', 'stats.css', '.trend-line/.donut-arc 的 stroke-dashoffset 終值必須壓過 stats 的 dashoffset:1，否則圖表全白'],
 ];
+
+/**
+ * 每支 @keyframes 都必須對 prefers-reduced-motion 表態——新增動畫沒表態就 fail。
+ * 這張表的價值在於**逼人做決定**，不是機械驗證：'keep' 的那些都附了理由。
+ */
+const MOTION: Readonly<Record<string, readonly ['off' | 'keep', string]>> = {
+  screenIn: ['off', '換頁淡入上滑'],
+  fadein: ['off', 'overlay/toast 淡入'],
+  sheetUp: ['off', '抽屜 30% 上滑＝前庭刺激源'],
+  barGrow: ['off', '長條由底長出'],
+  drawStroke: ['off', '描筆——關掉時必須另補 stroke-dashoffset:0，否則趨勢線與環圖永久空白'],
+  spin: ['keep', '載入指示器凍住＝在說謊；14px 小圓不是前庭刺激源'],
+};
 
 describe('styles barrel（順序即契約）', () => {
   it('barrel 只准有 @import / 註解 / 空行——不准直接寫規則', () => {
@@ -69,6 +86,25 @@ describe('styles barrel（順序即契約）', () => {
 
   it('base.css 排第一（reset / @font-face / :root tokens 必須先於一切）', () => {
     expect(imported[0]).toBe('base.css');
+  });
+
+  it('每支 @keyframes 都對 prefers-reduced-motion 表態（新增動畫未表態即 fail）', () => {
+    const names = new Set<string>();
+    for (const name of onDisk) {
+      const body = fs.readFileSync(path.join(LEAF_DIR, name), 'utf8');
+      for (const m of body.matchAll(/@keyframes\s+([\w-]+)/g)) names.add(m[1]!);
+    }
+    expect([...names].sort(), '有動畫沒進 MOTION 決策表，或表裡有已刪除的動畫').toEqual(
+      Object.keys(MOTION).sort(),
+    );
+  });
+
+  it('motion.css 補回 stroke-dashoffset 終值（只寫 animation:none 會讓統計圖永久空白）', () => {
+    const body = fs.readFileSync(path.join(LEAF_DIR, 'motion.css'), 'utf8');
+    expect(body).toMatch(/stroke-dashoffset:\s*0/);
+    // .spinner 刻意保留動畫——被加進**選擇器**就是有人沒讀那段註解（註解本身有提到它，先去掉）
+    const rules = body.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(rules).not.toMatch(/\.spinner/);
   });
 
   it('CSS 引用的站內資產必須存在於 public/（改副檔名或搬檔漏改一處=靜默退回，不會報錯）', () => {
