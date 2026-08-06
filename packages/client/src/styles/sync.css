@@ -1,0 +1,42 @@
+/* 同步頁：QR、房間碼毛筆字、進度、摘要 */
+.sync-live {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.qr-box {
+  width: 220px;
+  height: 220px;
+  border: 1px solid var(--line-gold);
+  border-radius: 8px;
+  background: #fdf8ec;
+  padding: 6px;
+}
+.qr-loading { display: flex; align-items: center; justify-content: center; }
+.room-code {
+  font-family: var(--font-brush);
+  font-size: 34px;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em; /* 平衡尾空 */
+  color: var(--scroll-ink);
+}
+.room-code-input {
+  text-align: center;
+  font-size: 22px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+.sync-status { margin: 0; letter-spacing: 0.08em; }
+.sync-err { margin: 0; font-size: 14px; }
+
+.sync-summary { align-items: center; }
+.summary-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 6px 18px;
+  font-size: 15px;
+}
+.summary-grid span { color: var(--dim); }
+.summary-grid b { text-align: right; }

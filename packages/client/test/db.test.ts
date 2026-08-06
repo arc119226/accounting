@@ -5,14 +5,18 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ExpenseRecord } from '@zhangben/core';
+import * as repo from '../src/db/repo';
+import { closeDbForTests } from '../src/db/db';
 
-// 每個測試都要全新 DB：fake-indexeddb/auto 是全域單例，用 deleteDatabase 重置，
-// 並動態 re-import repo（它快取 dbPromise）
-async function freshRepo() {
-  indexedDB.deleteDatabase('zhangben');
-  // vitest 模組快取以 query 打破（db.ts 的 dbPromise 是模組層單例）
-  const mod = await import(`../src/db/repo?t=${Date.now()}`);
-  return mod as typeof import('../src/db/repo');
+// 每個測試都要全新 DB：先關連線（開啟中的連線會 block deleteDatabase）再刪庫
+async function resetDb(): Promise<void> {
+  await closeDbForTests();
+  await new Promise<void>((resolve, reject) => {
+    const rq = indexedDB.deleteDatabase('zhangben');
+    rq.onsuccess = () => resolve();
+    rq.onblocked = () => resolve();
+    rq.onerror = () => reject(rq.error as Error);
+  });
 }
 
 function rec(over: Partial<ExpenseRecord> & { id: string }): ExpenseRecord {
@@ -31,12 +35,11 @@ function rec(over: Partial<ExpenseRecord> & { id: string }): ExpenseRecord {
 }
 
 describe('db/repo', () => {
-  beforeEach(() => {
-    indexedDB.deleteDatabase('zhangben');
+  beforeEach(async () => {
+    await resetDb();
   });
 
   it('首次啟動 seed 內建八分類並落盤', async () => {
-    const repo = await freshRepo();
     const first = await repo.loadAll();
     expect(first.categories.size).toBe(8);
     expect(first.categories.get('cat-food')?.glyph).toBe('食');
@@ -46,7 +49,6 @@ describe('db/repo', () => {
   });
 
   it('記錄寫穿後重載讀得回來（含墓碑）', async () => {
-    const repo = await freshRepo();
     await repo.loadAll();
     await repo.putRecord(rec({ id: 'r1', amount: 250 }));
     await repo.putRecord(rec({ id: 'r2', deleted: true }));
@@ -56,7 +58,6 @@ describe('db/repo', () => {
   });
 
   it('發票號碼 unique index：同號不同 id 的第二筆寫入被拒', async () => {
-    const repo = await freshRepo();
     await repo.loadAll();
     const inv = { number: 'AB12345678', randomCode: '1234' };
     await repo.putRecord(rec({ id: 'r1', invoice: inv, source: 'einvoice' }));
@@ -67,7 +68,6 @@ describe('db/repo', () => {
   });
 
   it('無發票的記錄不進 by-invoice 索引（多筆無發票共存）', async () => {
-    const repo = await freshRepo();
     await repo.loadAll();
     await repo.putRecord(rec({ id: 'r1' }));
     await repo.putRecord(rec({ id: 'r2' }));

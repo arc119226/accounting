@@ -32,6 +32,15 @@ const DB_VERSION = 1;
 
 let dbPromise: Promise<IDBPDatabase<ZbDB>> | null = null;
 
+/** 測試專用：關閉連線並重置單例——開啟中的連線會 block deleteDatabase，
+ *  不關掉的話測試間的「全新 DB」是假的（上一測資料還在）。 */
+export async function closeDbForTests(): Promise<void> {
+  if (dbPromise) {
+    (await dbPromise).close();
+    dbPromise = null;
+  }
+}
+
 export function getDb(): Promise<IDBPDatabase<ZbDB>> {
   dbPromise ??= openDB<ZbDB>(DB_NAME, DB_VERSION, {
     upgrade(db) {

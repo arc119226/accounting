@@ -29,12 +29,18 @@ importers:
       idb:
         specifier: ^8.0.0
         version: 8.0.3
+      qrcode-generator:
+        specifier: ^2.0.4
+        version: 2.0.4
       react:
         specifier: ^18.3.0
         version: 18.3.1
       react-dom:
         specifier: ^18.3.0
         version: 18.3.1(react@18.3.1)
+      trystero:
+        specifier: ^0.25.3
+        version: 0.25.3
       zustand:
         specifier: ^5.0.0
         version: 5.0.14(@types/react@18.3.31)(react@18.3.1)
@@ -401,6 +407,9 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@noble/secp256k1@3.1.0':
+    resolution: {integrity: sha512-+F7iS7tUMaNGXcc9X3PjmjvuQnXEuSjCRNzVVA2xAcKXgCaP0dHYz4SFyt4FKNHef7sOP//xihowcySSS7PK9g==}
+
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
 
@@ -541,6 +550,12 @@ packages:
     resolution: {integrity: sha512-zD6NdeWEByGE9QF9vCrlJ5YQB4oq9q91kPZS37Jwj5hOkvR1lTBSpsKhKDw4IJtbQ35LsTS1HD9DZYGKIshU1Q==}
     cpu: [x64]
     os: [win32]
+
+  '@trystero-p2p/core@0.25.3':
+    resolution: {integrity: sha512-lQKNq/ha+vF6kQZrpaXJGzlzxLF/Fhizoy5dwJUYQlkqRrbPup/Jov2EpPX/CPr2X+f79HxVzonkeni3MxmCuQ==}
+
+  '@trystero-p2p/nostr@0.25.3':
+    resolution: {integrity: sha512-nZV9Fl/GXuhIkJSQ+wIkdMoRLO1oSTUL/+vZorukaojeAdOpT/61e8b9Vzbt8L1ktMTaGPEJHw2BG/B5BCwBuw==}
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -1082,6 +1097,9 @@ packages:
   pure-rand@6.1.0:
     resolution: {integrity: sha512-bVWawvoZoBYpp6yIoQtQXHZjmz35RSVHnUOTefl8Vcjr8snTPY1wnpSPMWekcFwbxI6gtmT7rSYPFvz71ldiOA==}
 
+  qrcode-generator@2.0.4:
+    resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
+
   react-dom@18.3.1:
     resolution: {integrity: sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw==}
     peerDependencies:
@@ -1173,6 +1191,9 @@ packages:
   tinyspy@4.0.4:
     resolution: {integrity: sha512-azl+t0z7pw/z958Gy9svOTuzqIk6xq+NSheJzn5MMWtWTFywIacg2wUlzKFGtt3cthx0r2SxMK0yzJOR0IES7Q==}
     engines: {node: '>=14.0.0'}
+
+  trystero@0.25.3:
+    resolution: {integrity: sha512-mm6Mzmm10OXKfvOA0tUG6XXqlQDIPdHg0//mEqA4ayrtdqiie4ZQpSluEp6074L+dCtotCfCn/B/CWLWavZK6Q==}
 
   ts-api-utils@2.5.0:
     resolution: {integrity: sha512-OJ/ibxhPlqrMM0UiNHJ/0CKQkoKF243/AEmplt3qpRgkW8VG7IfOS41h7V8TjITqdByHzrjcS/2si+y4lIh8NA==}
@@ -1605,6 +1626,8 @@ snapshots:
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
 
+  '@noble/secp256k1@3.1.0': {}
+
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
   '@rollup/rollup-android-arm-eabi@4.62.4':
@@ -1681,6 +1704,13 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.62.4':
     optional: true
+
+  '@trystero-p2p/core@0.25.3': {}
+
+  '@trystero-p2p/nostr@0.25.3':
+    dependencies:
+      '@noble/secp256k1': 3.1.0
+      '@trystero-p2p/core': 0.25.3
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -2258,6 +2288,8 @@ snapshots:
 
   pure-rand@6.1.0: {}
 
+  qrcode-generator@2.0.4: {}
+
   react-dom@18.3.1(react@18.3.1):
     dependencies:
       loose-envify: 1.4.0
@@ -2352,6 +2384,10 @@ snapshots:
   tinyrainbow@2.0.0: {}
 
   tinyspy@4.0.4: {}
+
+  trystero@0.25.3:
+    dependencies:
+      '@trystero-p2p/nostr': 0.25.3
 
   ts-api-utils@2.5.0(typescript@5.9.3):
     dependencies:

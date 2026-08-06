@@ -3,16 +3,16 @@
  * 讓 `.screen` 的進場動畫（styles/base.css screenIn）每次換頁重播。
  * 底部四鈕（帳本/掃發票/統計/同步）+ 右上角設定；EntrySheet 是 overlay 不佔屏。
  */
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { useAppStore, type Screen } from './store/appStore';
 import { noteChunkLoadFailure } from './version';
 import { AppToast } from './ui/AppToast';
-import { ConfirmDialog } from './ui/ConfirmDialog';
 import { LedgerScreen } from './ui/LedgerScreen';
 import { EntrySheet } from './ui/EntrySheet';
 import { CategoriesScreen } from './ui/CategoriesScreen';
 import { SettingsScreen } from './ui/SettingsScreen';
 import { StatsScreen } from './ui/StatsScreen';
+import { SyncScreen } from './ui/SyncScreen';
 import { InkDefs } from './ui/charts/InkDefs';
 
 // 掃描頁 lazy chunk：偵測引擎（含 1MB wasm 載點）只在首掃進入；
@@ -25,33 +25,7 @@ const ScanScreen = lazy(() =>
       throw err;
     }),
 );
-import { APP, NAV, PLACEHOLDER } from './strings/ui';
-
-function PlaceholderScreen() {
-  // M2–M4 陸續替換：驗證樣式全鏈路的暫用畫面
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  return (
-    <div className="screen-body">
-      <div className="paper-card">
-        <p className="dim-text">{PLACEHOLDER.wip}</p>
-        <div className="modal-actions">
-          <button className="primary-btn" onClick={() => setConfirmOpen(true)}>
-            測試對話框
-          </button>
-        </div>
-      </div>
-      {confirmOpen && (
-        <ConfirmDialog
-          title="樣式驗證"
-          body="宣紙對話框：點背景或 Esc 取消。"
-          confirmLabel="好"
-          onConfirm={() => setConfirmOpen(false)}
-          onCancel={() => setConfirmOpen(false)}
-        />
-      )}
-    </div>
-  );
-}
+import { APP, NAV } from './strings/ui';
 
 const NAV_ITEMS: readonly { readonly key: Screen; readonly label: string; readonly glyph: string }[] = [
   { key: 'ledger', label: NAV.ledger, glyph: '帳' },
@@ -98,9 +72,9 @@ export function App() {
               <ScanScreen />
             </Suspense>
           )
+          : screen === 'sync' ? <SyncScreen />
           : screen === 'categories' ? <CategoriesScreen />
-          : screen === 'settings' ? <SettingsScreen />
-          : <PlaceholderScreen />}
+          : <SettingsScreen />}
       </div>
       <nav className="bottom-nav">
         {NAV_ITEMS.map((it) => (

@@ -7,7 +7,7 @@ import { addMonths, budgetProgress, formatMonthZh, formatNTD, monthOf, type Expe
 import { useAppStore } from '../store/appStore';
 import { attachDrag } from '../gesture';
 import { BudgetTotalBrush } from './charts/BudgetBrush';
-import { LEDGER } from '../strings/ui';
+import { LEDGER, SYNC } from '../strings/ui';
 
 /** 分類印章：色彩經 color-mix 65% 壓向墨色（高彩在宣紙上才不刺眼） */
 export function CategorySeal({ glyph, color }: { glyph: string; color: string }) {
@@ -66,6 +66,26 @@ function DayGroup({ date, rows }: { date: string; rows: ExpenseRecord[] }) {
         );
       })}
     </section>
+  );
+}
+
+/** 備份提醒：距上次同步/匯出 >30 天且帳上有記錄才出現（新用戶不騷擾） */
+function BackupNag() {
+  const settings = useAppStore((s) => s.settings);
+  const peers = useAppStore((s) => s.peers);
+  const records = useAppStore((s) => s.records);
+  const setScreen = useAppStore((s) => s.setScreen);
+  if (records.size === 0) return null;
+  const lastCare = Math.max(settings.lastExportMs, ...peers.map((p) => p.lastSyncWallMs), 0);
+  // 從未備份：以第一筆記錄存在即開始計時的話會立刻騷擾新用戶——放寬為「從未+帳上>30筆」
+  const stale = lastCare > 0
+    ? Date.now() - lastCare > 30 * 24 * 60 * 60 * 1000
+    : records.size > 30;
+  if (!stale) return null;
+  return (
+    <button className="backup-nag" onClick={() => setScreen('sync')}>
+      {SYNC.backupNag}
+    </button>
   );
 }
 
@@ -138,6 +158,8 @@ export function LedgerScreen() {
       </div>
 
       <BudgetTotalBrush progress={budgetProg} compact />
+
+      <BackupNag />
 
       {groups.length === 0 ? (
         <p className="dim-text empty-hint">{LEDGER.emptyMonth}</p>

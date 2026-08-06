@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import { createLedgerSlice, type LedgerSlice } from './ledgerSlice';
 import { createSettingsSlice, type SettingsSlice } from './settingsSlice';
+import { createSyncSlice, type SyncSlice } from './syncSlice';
 
 export type Screen = 'ledger' | 'scan' | 'stats' | 'sync' | 'settings' | 'categories';
 
@@ -14,11 +15,12 @@ export interface ShellSlice {
   setScreen(screen: Screen): void;
 }
 
-export type AppStore = ShellSlice & LedgerSlice & SettingsSlice;
+export type AppStore = ShellSlice & LedgerSlice & SettingsSlice & SyncSlice;
 
 export const useAppStore = create<AppStore>()((set, get, store) => ({
   screen: 'ledger',
   setScreen: (screen) => set({ screen }),
   ...createLedgerSlice(set, get, store),
   ...createSettingsSlice(set, get, store),
+  ...createSyncSlice(set, get, store),
 }));

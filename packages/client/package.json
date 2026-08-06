@@ -14,8 +14,10 @@
     "@zhangben/core": "workspace:*",
     "barcode-detector": "^3.2.1",
     "idb": "^8.0.0",
+    "qrcode-generator": "^2.0.4",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
+    "trystero": "^0.25.3",
     "zustand": "^5.0.0",
     "zxing-wasm": "^3.1.1"
   },

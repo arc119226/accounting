@@ -97,6 +97,20 @@
 
 .empty-hint { text-align: center; margin-top: 40px; letter-spacing: 0.1em; }
 
+/* 備份提醒：紙訊息質感、可整條點擊進同步頁 */
+.backup-nag {
+  background: #efe6d2;
+  border: 1px solid #b08d57;
+  color: #6b4c1d;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  line-height: 1.5;
+}
+.backup-nag:active { filter: brightness(0.96); }
+
 /* 記一筆 FAB：底部導覽上方置中，硃砂印泥感 */
 .add-fab {
   position: fixed;

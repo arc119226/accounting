@@ -20,9 +20,19 @@ setSaveErrorHandler(() => {
   show('saveFailed');
 });
 
-// 開機：載入帳本（首次啟動 seed 內建分類）+ 申請持久儲存（WebKit 每次會話重問，冪等）
+// 開機：載入帳本（首次啟動 seed 內建分類）+ peers + 申請持久儲存（WebKit 每次會話重問，冪等）
 void useAppStore.getState().hydrate();
+void useAppStore.getState().loadPeers();
 void import('./db/persist').then((m) => m.requestPersist());
+
+// 同步 deep link：主持方 QR 內容是 https://<domain>/#sync=<code>，
+// 對方用系統相機掃 → 開 app 直接進同步頁入房
+const syncLink = /#sync=([A-Z2-9]{6})/i.exec(location.hash);
+if (syncLink) {
+  history.replaceState(null, '', location.pathname);
+  useAppStore.getState().setScreen('sync');
+  useAppStore.getState().joinSync(syncLink[1]!);
+}
 
 if (import.meta.env.DEV) {
   Object.assign(window as unknown as Record<string, unknown>, { __store: useAppStore });
