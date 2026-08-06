@@ -176,6 +176,8 @@ export const BUDGET = {
 
 export const SETTINGS = {
   title: '設定',
+  iosInstallTitle: '安裝到主畫面',
+  iosInstallBody: '用 Safari 開啟本頁 → 點「分享」→「加入主畫面」。安裝後帳本資料更不易被瀏覽器回收，開啟也更快。',
   whoAmI: '這支手機的主人',
   namesLabel: '兩人稱呼',
   nameA: '甲的稱呼',

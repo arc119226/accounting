@@ -8,7 +8,7 @@ import type { AppStore } from './appStore';
 import * as repo from '../db/repo';
 import { recvClock, tickClock } from '../clock';
 import { getDeviceId } from '../ids';
-import { makeRoomCode, startSync, type SyncHandle } from '../sync/trystero';
+import type { SyncHandle } from '../sync/trystero';
 import type { PeerHello, SyncKind, SyncSession, SyncTotals } from '../sync/protocol';
 import { buildExport, downloadExport, parseImport } from '../sync/exportFile';
 import { logError } from '../errlog';
@@ -75,9 +75,11 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
     };
   }
 
-  function begin(role: 'host' | 'join', code: string): void {
+  async function begin(role: 'host' | 'join', code: string): Promise<void> {
     handle?.cancel();
     set({ syncRole: role, roomCode: code, importSummary: null, importFailed: false, clockDriftMs: null });
+    // trystero（+WebRTC 週邊）只在真的要同步時載入——省主 bundle 一大截
+    const { startSync } = await import('../sync/trystero');
     handle = startSync(code, myHello(), {
       getLocalRows(kind) {
         const s = get();
@@ -135,13 +137,19 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
     },
 
     hostSync() {
-      begin('host', makeRoomCode());
+      // 房間碼字集去 0/O/1/I/L（與 trystero.ts 的 CODE_ALPHABET 同源常數在該檔；
+      // 這裡 inline 產碼避免為了一個常數載入整個 trystero chunk）
+      const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+      const buf = new Uint32Array(6);
+      crypto.getRandomValues(buf);
+      const code = [...buf].map((n) => alphabet[n % alphabet.length]!).join('');
+      void begin('host', code);
     },
 
     joinSync(code) {
       const clean = code.trim().toUpperCase();
       if (clean.length !== 6) return;
-      begin('join', clean);
+      void begin('join', clean);
     },
 
     cancelSync() {

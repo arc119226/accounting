@@ -118,6 +118,22 @@ function fmtBytes(n: number): string {
   return `${n} B`;
 }
 
+/** iOS 沒有 beforeinstallprompt：Safari 分頁模式下給中文安裝教學
+ *  （安裝到主畫面=獨立儲存計數器，比分頁的 7 天回收安全得多） */
+function IosInstallHint() {
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const standalone =
+    ('standalone' in navigator && (navigator as { standalone?: boolean }).standalone === true) ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if (!isIos || standalone) return null;
+  return (
+    <div className="paper-card">
+      <div className="field-label">{SETTINGS.iosInstallTitle}</div>
+      <p className="dim-text storage-line">{SETTINGS.iosInstallBody}</p>
+    </div>
+  );
+}
+
 export function SettingsScreen() {
   const settings = useAppStore((s) => s.settings);
   const updateSettings = useAppStore((s) => s.updateSettings);
@@ -161,6 +177,8 @@ export function SettingsScreen() {
       </div>
 
       <BudgetCard />
+
+      <IosInstallHint />
 
       <div className="paper-card">
         <button className="ghost-btn" onClick={() => setScreen('categories')}>
