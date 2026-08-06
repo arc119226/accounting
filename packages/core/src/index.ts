@@ -49,11 +49,14 @@ export {
 } from './merge';
 export {
   dailyTrend,
+  monthSummary,
   sumByCategory,
   sumByMonth,
   sumByPerson,
+  type CategoryDelta,
   type CategoryTotal,
   type DayPoint,
+  type MonthSummary,
   type MonthTotal,
 } from './stats';
 export { budgetProgress, type BudgetLine, type BudgetProgress } from './budget';

@@ -9,6 +9,7 @@ import { attachDrag } from '../gesture';
 import { matchesPersonFilter, sortPersonsForTabs } from '../personView';
 import { BudgetTotalBrush } from './charts/BudgetBrush';
 import { PersonTabs } from './PersonTabs';
+import { draftFromRecord } from '../store/ledgerSlice';
 import { LEDGER, SYNC } from '../strings/ui';
 
 /** 分類印章：色彩經 color-mix 65% 壓向墨色（高彩在宣紙上才不刺眼） */
@@ -44,15 +45,7 @@ function DayGroup({ date, rows }: { date: string; rows: ExpenseRecord[] }) {
             key={r.id}
             className="entry-row"
             onClick={() =>
-              openEntry({
-                editingId: r.id,
-                amount: r.amount,
-                date: r.date,
-                categoryId: r.categoryId,
-                note: r.note,
-                merchantName: r.merchant?.name ?? '',
-                paidBy: r.paidBy,
-              })
+              openEntry(draftFromRecord(r))
             }
           >
             <CategorySeal glyph={cat?.glyph ?? '雜'} color={cat?.color ?? '#6e6046'} />

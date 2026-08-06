@@ -22,7 +22,7 @@ import {
 import { useAppStore } from '../store/appStore';
 import { getPersonId } from '../ids';
 import { sortPersonsForTabs } from '../personView';
-import { todayISO } from '../store/ledgerSlice';
+import { draftFromRecord, todayISO } from '../store/ledgerSlice';
 import { getDetector } from '../scan/detector';
 import { acquireCamera } from '../scan/camera';
 import { show } from '../notice';
@@ -79,10 +79,9 @@ function PreviewCard({
         <span className="seal-char">{SCAN.previewTitle.slice(0, 1)}</span>
         {SCAN.previewTitle.slice(1)}
       </div>
-      <p className="dim-text inv-no tnum">
-        {SCAN.invNoLabel} {inv.number}
-      </p>
-
+      {/* 欄位序＝「最可能要動的擺最上面」：金額是右碼合併失手時唯一會被寫錯的欄位，
+          分類是 suggestCategory 用猜的。日期與發票號碼是從左碼直接解出來的、幾乎不會錯，
+          所以往下沉；品項本來就是收合的。 */}
       <label className="field-label">{SCAN.amountLabel}</label>
       <input
         className="text-input scan-amount tnum"
@@ -91,8 +90,15 @@ function PreviewCard({
         onChange={(e) => setAmountStr(e.target.value)}
       />
 
-      <label className="field-label">{ENTRY.dateLabel}</label>
-      <input type="date" className="text-input" value={date} max={todayISO()} onChange={(e) => e.target.value && setDate(e.target.value)} />
+      <label className="field-label">{ENTRY.categoryLabel}</label>
+      <div className="cat-scroller">
+        {cats.map((c) => (
+          <button key={c.id} className={`paper-label${categoryId === c.id ? ' active' : ''}`} onClick={() => setCategoryId(c.id)}>
+            {c.glyph}
+            {c.name}
+          </button>
+        ))}
+      </div>
 
       <label className="field-label">{ENTRY.merchantLabel}</label>
       <input
@@ -112,15 +118,8 @@ function PreviewCard({
         ))}
       </div>
 
-      <label className="field-label">{ENTRY.categoryLabel}</label>
-      <div className="cat-scroller">
-        {cats.map((c) => (
-          <button key={c.id} className={`paper-label${categoryId === c.id ? ' active' : ''}`} onClick={() => setCategoryId(c.id)}>
-            {c.glyph}
-            {c.name}
-          </button>
-        ))}
-      </div>
+      <label className="field-label">{ENTRY.dateLabel}</label>
+      <input type="date" className="text-input" value={date} max={todayISO()} onChange={(e) => e.target.value && setDate(e.target.value)} />
 
       <label className="field-label">{ENTRY.noteLabel}</label>
       <input
@@ -130,6 +129,10 @@ function PreviewCard({
         maxLength={40}
         onChange={(e) => setNote(e.target.value)}
       />
+
+      <p className="dim-text inv-no tnum">
+        {SCAN.invNoLabel} {inv.number}
+      </p>
 
       {inv.items.length > 0 && (
         <details className="scan-items">
@@ -392,17 +395,7 @@ export function ScanScreen() {
             <div className="modal-actions">
               <button
                 className="primary-btn"
-                onClick={() =>
-                  openEntry({
-                    editingId: result.rec.id,
-                    amount: result.rec.amount,
-                    date: result.rec.date,
-                    categoryId: result.rec.categoryId,
-                    note: result.rec.note,
-                    merchantName: result.rec.merchant?.name ?? '',
-                    paidBy: result.rec.paidBy,
-                  })
-                }
+                onClick={() => openEntry(draftFromRecord(result.rec))}
               >
                 {SCAN.viewExisting}
               </button>

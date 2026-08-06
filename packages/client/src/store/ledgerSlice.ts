@@ -27,6 +27,22 @@ export interface EntryDraft {
   readonly paidBy: string;
 }
 
+/**
+ * 記錄 → 抽屜草稿。三處（帳本列、統計的分類明細、掃描的「查看該筆」）本來各抄一份，
+ * 月結摘要卡會是第四份——抄第四次前先抽出來。
+ */
+export function draftFromRecord(r: ExpenseRecord): EntryDraft {
+  return {
+    editingId: r.id,
+    amount: r.amount,
+    date: r.date,
+    categoryId: r.categoryId,
+    note: r.note,
+    merchantName: r.merchant?.name ?? '',
+    paidBy: r.paidBy,
+  };
+}
+
 export interface EntryValues {
   readonly amount: number;
   readonly date: string;

@@ -75,7 +75,23 @@
 .inv-no { font-size: 13px; letter-spacing: 0.06em; }
 .scan-amount { font-size: 24px; font-weight: 700; text-align: right; }
 
-.scan-items summary { cursor: pointer; padding: 4px 0; }
+/* 入帳鈕釘在捲動區底：品項多的時候原本要先捲到最底才按得到。
+   負邊距抵掉 .paper-card 的 18px/20px 內距 ⇒ 紙底鋪滿卡片寬、貼齊下緣；
+   13px 圓角＝卡片 14px 減 1px 邊框的內圓角。
+   金線用 --gold-hairline（半透明）不用 --line-gold（實色）：它是「下面還有內容」的暗示，
+   不是分隔規線。不加安全區內距——.bottom-nav 已經吃掉了。 */
+.scan-preview .sheet-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 -20px -18px;
+  padding: 10px 20px;
+  background: var(--card);
+  border-top: 1px solid var(--gold-hairline);
+  border-radius: 0 0 13px 13px;
+}
+
+.scan-items summary { cursor: pointer; padding: 12px 0; min-height: 44px; }
 .scan-item-row {
   display: flex;
   justify-content: space-between;

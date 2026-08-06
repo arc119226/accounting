@@ -12,7 +12,7 @@ import fc from 'fast-check';
 import type { DateRange } from '../src/rocdate';
 import { addMonths, daysInMonth } from '../src/rocdate';
 import type { ExpenseRecord } from '../src/types';
-import { dailyTrend, sumByCategory, sumByMonth, sumByPerson } from '../src/stats';
+import { dailyTrend, monthSummary, sumByCategory, sumByMonth, sumByPerson } from '../src/stats';
 import type { CategoryTotal, DayPoint, MonthTotal } from '../src/stats';
 
 // ---------- arbitraries ----------
@@ -345,5 +345,148 @@ describe('dailyTrend', () => {
     expect(got[1]).toEqual({ date: '2026-02-02', total: 0, cumulative: 15 });
     expect(got[2]).toEqual({ date: '2026-02-03', total: 20, cumulative: 35 });
     expect(got[27]?.cumulative).toBe(35);
+  });
+});
+
+// ---------- monthSummary ----------
+
+/**
+ * 月結摘要——本月 vs 上月、變動最大的分類、最大單筆。
+ * 一樣配暴力對照組：這裡最容易錯的是「桶算到隔壁月」與「movers 只看單邊分類」。
+ */
+describe('monthSummary', () => {
+  const r = (over: Partial<ExpenseRecord> & { id: string; date: string; amount: number }): ExpenseRecord => ({
+    updatedAt: '1',
+    deviceId: 'x',
+    deleted: false,
+    categoryId: 'food',
+    note: '',
+    paidBy: 'p1',
+    source: 'manual',
+    ...over,
+  });
+
+  it('本月/上月合計、差額與百分比', () => {
+    const s = monthSummary(
+      [
+        r({ id: 'a', date: '2026-08-01', amount: 300 }),
+        r({ id: 'b', date: '2026-08-20', amount: 200 }),
+        r({ id: 'c', date: '2026-07-15', amount: 400 }),
+        r({ id: 'd', date: '2026-06-01', amount: 999 }), // 兩個月前：不列入
+      ],
+      '2026-08',
+      3,
+    );
+    expect(s.total).toBe(500);
+    expect(s.prevTotal).toBe(400);
+    expect(s.delta).toBe(100);
+    expect(s.deltaPct).toBe(25);
+    expect(s.prevMonth).toBe('2026-07');
+  });
+
+  it('上月無記錄 ⇒ deltaPct 是 null（不是 Infinity 也不是 0）', () => {
+    const s = monthSummary([r({ id: 'a', date: '2026-08-01', amount: 300 })], '2026-08', 3);
+    expect(s.deltaPct).toBeNull();
+    expect(s.delta).toBe(300);
+  });
+
+  it('movers 取兩月分類的聯集——這個月完全沒花的分類正是最該被看見的變動', () => {
+    const s = monthSummary(
+      [
+        r({ id: 'a', date: '2026-07-01', amount: 5000, categoryId: 'travel' }),
+        r({ id: 'b', date: '2026-08-01', amount: 100, categoryId: 'food' }),
+      ],
+      '2026-08',
+      3,
+    );
+    expect(s.movers[0]).toEqual({ categoryId: 'travel', current: 0, previous: 5000, delta: -5000 });
+    expect(s.movers[1]).toEqual({ categoryId: 'food', current: 100, previous: 0, delta: 100 });
+  });
+
+  it('delta=0 的分類不列；|delta| 同值時 categoryId 升冪（決定性）', () => {
+    const s = monthSummary(
+      [
+        r({ id: 'a', date: '2026-07-01', amount: 100, categoryId: 'same' }),
+        r({ id: 'b', date: '2026-08-01', amount: 100, categoryId: 'same' }),
+        r({ id: 'c', date: '2026-08-02', amount: 50, categoryId: 'zzz' }),
+        r({ id: 'd', date: '2026-08-03', amount: 50, categoryId: 'aaa' }),
+      ],
+      '2026-08',
+      5,
+    );
+    expect(s.movers.map((m) => m.categoryId)).toEqual(['aaa', 'zzz']);
+  });
+
+  it('topMovers 截斷；<=0 回空', () => {
+    const rows = ['a', 'b', 'c', 'd'].map((c, i) => r({ id: c, date: '2026-08-01', amount: (i + 1) * 100, categoryId: c }));
+    expect(monthSummary(rows, '2026-08', 2).movers).toHaveLength(2);
+    expect(monthSummary(rows, '2026-08', 0).movers).toHaveLength(0);
+  });
+
+  it('最大單筆：同額取 id 較小者；本月無記錄 ⇒ null', () => {
+    const s = monthSummary(
+      [r({ id: 'zz', date: '2026-08-01', amount: 900 }), r({ id: 'aa', date: '2026-08-02', amount: 900 })],
+      '2026-08',
+      3,
+    );
+    expect(s.largestId).toBe('aa');
+    expect(s.largestAmount).toBe(900);
+    expect(monthSummary([], '2026-08', 3).largestId).toBeNull();
+  });
+
+  it('墓碑全數排除——刪掉的大額記錄不可變成「本月最大一筆」', () => {
+    const s = monthSummary(
+      [
+        r({ id: 'big', date: '2026-08-01', amount: 99999, deleted: true }),
+        r({ id: 'real', date: '2026-08-02', amount: 100 }),
+        r({ id: 'oldbig', date: '2026-07-01', amount: 88888, deleted: true }),
+      ],
+      '2026-08',
+      3,
+    );
+    expect(s.largestId).toBe('real');
+    expect(s.total).toBe(100);
+    expect(s.prevTotal).toBe(0);
+  });
+
+  it('跨年：2026-01 的上月是 2025-12', () => {
+    const s = monthSummary([r({ id: 'a', date: '2025-12-31', amount: 500 })], '2026-01', 3);
+    expect(s.prevMonth).toBe('2025-12');
+    expect(s.prevTotal).toBe(500);
+  });
+
+  it('性質：與暴力對照組等價', () => {
+    fc.assert(
+      fc.property(recsArb, monthArb, (recs, month) => {
+        const got = monthSummary(recs, month, 3);
+        const prevMonth = addMonths(month, -1);
+        const live = recs.filter((x) => !x.deleted);
+        const cur = live.filter((x) => x.date.slice(0, 7) === month);
+        const prv = live.filter((x) => x.date.slice(0, 7) === prevMonth);
+        const sum = (rows: ExpenseRecord[]) => rows.reduce((s, x) => s + x.amount, 0);
+        expect(got.total).toBe(sum(cur));
+        expect(got.prevTotal).toBe(sum(prv));
+        expect(got.delta).toBe(sum(cur) - sum(prv));
+        expect(got.deltaPct).toBe(sum(prv) === 0 ? null : Math.round(((sum(cur) - sum(prv)) / sum(prv)) * 100));
+        // 最大單筆：同額取 id 最小
+        const best = cur.reduce<ExpenseRecord | null>(
+          (m, x) => (m === null || x.amount > m.amount || (x.amount === m.amount && x.id < m.id) ? x : m),
+          null,
+        );
+        expect(got.largestId).toBe(best?.id ?? null);
+        // movers：聯集、去零、|delta| 降冪 + id 升冪
+        const cats = new Set([...cur, ...prv].map((x) => x.categoryId));
+        const expected = [...cats]
+          .map((categoryId) => {
+            const c = sum(cur.filter((x) => x.categoryId === categoryId));
+            const p = sum(prv.filter((x) => x.categoryId === categoryId));
+            return { categoryId, current: c, previous: p, delta: c - p };
+          })
+          .filter((m) => m.delta !== 0)
+          .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || (a.categoryId < b.categoryId ? -1 : 1))
+          .slice(0, 3);
+        expect(got.movers).toEqual(expected);
+      }),
+    );
   });
 });

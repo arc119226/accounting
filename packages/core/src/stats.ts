@@ -148,3 +148,83 @@ export function dailyTrend(recs: Iterable<ExpenseRecord>, month: string): readon
   }
   return out;
 }
+
+export interface CategoryDelta {
+  readonly categoryId: string;
+  readonly current: number;
+  readonly previous: number;
+  /** current − previous（正=這個月多花了） */
+  readonly delta: number;
+}
+
+export interface MonthSummary {
+  readonly month: string;
+  readonly prevMonth: string;
+  readonly total: number;
+  readonly prevTotal: number;
+  readonly delta: number;
+  /**
+   * 四捨五入到整數的百分比變化；prevTotal=0 時是 **null**（無從比較，UI 改講「上月無記錄」）。
+   * 用 null 而非 optional：這個欄位畫面每次都要讀，省略它只會換來 exactOptionalPropertyTypes 的舞步。
+   */
+  readonly deltaPct: number | null;
+  /** |delta| 降冪、同值 categoryId 升冪；delta=0 不列；至多 topMovers 筆 */
+  readonly movers: readonly CategoryDelta[];
+  /** 本月最大單筆的 id；同額取 id 較小者（決定性）；本月無記錄=null */
+  readonly largestId: string | null;
+  readonly largestAmount: number;
+}
+
+/**
+ * 月結摘要：本月 vs 上月、變動最大的幾個分類、本月最大單筆。
+ *
+ * 一趟掃完兩個月：月結卡是「回頭看一眼」的東西，不值得為它多掃幾遍全帳。
+ * movers 取兩個月分類的**聯集**——某分類這個月完全沒花（上月花很多）正是最該被看見的變動。
+ */
+export function monthSummary(
+  recs: Iterable<ExpenseRecord>,
+  month: string,
+  topMovers: number,
+): MonthSummary {
+  const prevMonth = addMonths(month, -1);
+  const cur = new Map<string, number>();
+  const prev = new Map<string, number>();
+  let total = 0;
+  let prevTotal = 0;
+  let largestId: string | null = null;
+  let largestAmount = 0;
+  for (const r of recs) {
+    if (r.deleted) continue;
+    const m = monthOf(r.date);
+    if (m === month) {
+      total += r.amount;
+      cur.set(r.categoryId, (cur.get(r.categoryId) ?? 0) + r.amount);
+      // 同額取 id 較小者：uuidv7 時間有序＝先記的那筆，且結果與 Map 迭代序無關
+      if (largestId === null || r.amount > largestAmount || (r.amount === largestAmount && r.id < largestId)) {
+        largestAmount = r.amount;
+        largestId = r.id;
+      }
+    } else if (m === prevMonth) {
+      prevTotal += r.amount;
+      prev.set(r.categoryId, (prev.get(r.categoryId) ?? 0) + r.amount);
+    }
+  }
+  const movers: CategoryDelta[] = [];
+  for (const categoryId of new Set([...cur.keys(), ...prev.keys()])) {
+    const c = cur.get(categoryId) ?? 0;
+    const p = prev.get(categoryId) ?? 0;
+    if (c - p !== 0) movers.push({ categoryId, current: c, previous: p, delta: c - p });
+  }
+  movers.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || (a.categoryId < b.categoryId ? -1 : 1));
+  return {
+    month,
+    prevMonth,
+    total,
+    prevTotal,
+    delta: total - prevTotal,
+    deltaPct: prevTotal === 0 ? null : Math.round(((total - prevTotal) / prevTotal) * 100),
+    movers: movers.slice(0, Math.max(0, Math.trunc(topMovers))),
+    largestId,
+    largestAmount,
+  };
+}

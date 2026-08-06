@@ -184,6 +184,14 @@ export const STATS = {
   personTitle: '兩人比較',
   budgetTitle: '預算',
   emptyRange: '此區間沒有記錄，紙上留白。',
+  summaryTitle: '月結摘要',
+  /** 後接金額與百分比 */
+  vsLastMore: '較上月多花 ',
+  vsLastLess: '較上月少花 ',
+  flat: '與上月持平',
+  noPrevMonth: '上月沒有記錄，無從比較',
+  moversTitle: '變動最大',
+  largestTitle: '本月最大一筆',
   countSuffix: ' 筆',
 } as const;
 
