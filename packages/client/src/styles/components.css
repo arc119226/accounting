@@ -62,8 +62,8 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
    而寫死 44 會讓放大的印章字畫到鈕外面。100% 時 2.75em = 44px，完全不改變現況。 */
 .corner-btn {
   position: relative;
-  min-width: max(44px, 2.75em);
-  min-height: max(44px, 2.75em);
+  min-width: clamp(44px, 2.75em, 64px);
+  min-height: clamp(44px, 2.75em, 64px);
   display: inline-flex;
   align-items: center;
   justify-content: center;

@@ -136,15 +136,18 @@ export function LedgerScreen() {
   return (
     <div className="screen-body ledger-body" ref={listRef}>
       <div className="month-nav">
-        <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, -1))}>
-          ‹
-        </button>
-        <div className="scroll-banner month-banner">{formatMonthZh(monthCursor)}</div>
-        <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, 1))}>
-          ›
-        </button>
-        {/* 合計獨立成第二列（見 ledger.css）：卷軸橫幅是標題不是資料列，
-            擠在一起會把兩顆箭頭推到貼死螢幕邊 */}
+        {/* 三顆包成一列（.month-row 不准換行）：靠 flex-wrap 讓合計換行的話，
+            斷行是用 hypothetical size 判定的（**先斷行、後收縮**），橫幅一寬就把「›」
+            擠到第二列。合計改由外層的 column 排到第二列，兩顆箭頭永遠與橫幅同列。 */}
+        <div className="month-row">
+          <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, -1))}>
+            ‹
+          </button>
+          <div className="scroll-banner month-banner">{formatMonthZh(monthCursor)}</div>
+          <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, 1))}>
+            ›
+          </button>
+        </div>
         <span className="month-total tnum">{LEDGER.totalPrefix}{formatNTD(monthTotal)}</span>
       </div>
 

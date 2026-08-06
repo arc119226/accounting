@@ -239,11 +239,11 @@
 .cat-tools { display: flex; gap: 4px; align-items: center; }
 /* ▲▼✕ 誤觸的代價是刪掉分類，寬度補到 44——代價是 .cat-name 從 89px 縮到 51px
    （約 3 字後 ellipsis，名稱本來就 maxLength=8），而分類管理一輩子只進幾次。 */
-.cat-tool { min-width: max(44px, 2.75em); padding: 6px 4px; font-size: 12px; }
+.cat-tool { min-width: clamp(44px, 2.75em, 64px); padding: 6px 4px; font-size: 12px; }
 .cat-color-input {
   /* 視覺仍是 30px 的色塊（原生色票填滿 content box），靠內距把命中區撐到 44 */
-  width: max(44px, 2.75em);
-  height: max(44px, 2.75em);
+  width: clamp(44px, 2.75em, 64px);
+  height: clamp(44px, 2.75em, 64px);
   padding: 7px;
   border: 1px solid var(--line);
   border-radius: 6px;

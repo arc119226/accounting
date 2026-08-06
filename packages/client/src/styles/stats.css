@@ -109,7 +109,7 @@
   flex-wrap: wrap;
 }
 .month-stepper { display: inline-flex; align-items: center; gap: 4px; }
-.stepper-btn { min-width: max(44px, 2.75em); padding: 4px 8px; }
+.stepper-btn { min-width: clamp(44px, 2.75em, 64px); padding: 4px 8px; }
 
 /* 預算設定（設定頁）。標籤與輸入框放不下就上下兩行：
    右對齊的數字框一旦裝不下，溢出方向是**左**，而 LTR 的可捲動溢出區不含左側
