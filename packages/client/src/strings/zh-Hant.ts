@@ -70,6 +70,11 @@ export const ENTRY = {
   dupConfirm: '仍要入帳',
   /** {note} 由呼叫端替換 */
   dupBodyPrefix: '同日已有一筆同額記錄：',
+  /** 入帳/改帳的 toast 前綴，後接金額 */
+  savedNew: '已記一筆 ',
+  savedEdit: '已改一筆 ',
+  /** 掃描來的記錄在帳本內回看（唯讀） */
+  invoiceSection: '發票內容',
 } as const;
 
 export const CATEGORIES = {
@@ -96,6 +101,7 @@ export const SCAN = {
   photoNone: '照片裡沒有讀到發票碼',
   previewTitle: '掃到一張發票',
   existsTitle: '這張發票已在帳上',
+  justSaved: '這張剛記過了——換下一張',
   viewExisting: '查看該筆',
   rescan: '重掃',
   invNoLabel: '發票號碼',
@@ -103,6 +109,13 @@ export const SCAN = {
   itemsLabel: '品項',
   itemsPartial: '（發票僅載部分品項）',
   save: '入帳',
+} as const;
+
+/** 品項自動備註的組字零件（core 只吐 names/total，文案在這裡） */
+export const ITEMNOTE = {
+  sep: '、',
+  etcPrefix: '…等',
+  etcSuffix: '項',
 } as const;
 
 export const RULES = {

@@ -56,6 +56,7 @@ export {
   type MonthTotal,
 } from './stats';
 export { budgetProgress, type BudgetLine, type BudgetProgress } from './budget';
+export { digestItems, type ItemDigest } from './notes';
 export { reconcileInvoiceDuplicates, type FreshEnvelope, type ReconcileResult } from './reconcile';
 export {
   looksLikeEInvoiceLeft,

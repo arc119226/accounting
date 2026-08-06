@@ -10,7 +10,7 @@ import { getPersonId } from '../ids';
 import { sortPersonsForTabs } from '../personView';
 import { findDuplicate, todayISO, type EntryValues } from '../store/ledgerSlice';
 import { ConfirmDialog } from './ConfirmDialog';
-import { ENTRY } from '../strings/ui';
+import { ENTRY, SCAN } from '../strings/ui';
 import { show } from '../notice';
 
 const KEYPAD = ['7', '8', '9', '4', '5', '6', '1', '2', '3', 'C', '0', '⌫'] as const;
@@ -38,6 +38,9 @@ export function EntrySheet() {
   const [paidBy, setPaidBy] = useState<string>(draft?.paidBy ?? getPersonId());
   const [showDatePick, setShowDatePick] = useState(false);
   const [confirm, setConfirm] = useState<'none' | 'dup' | 'delete'>('none');
+  // 編輯掃描來的記錄時把原列撈出來看發票號碼與品項（EntryDraft 只帶 7 個可編輯欄位）。
+  // 窄 selector：記錄物件參考在該列沒變動時是穩定的，訂閱成本可忽略
+  const record = useAppStore((s) => (draft?.editingId ? s.records.get(draft.editingId) : undefined));
 
   if (!draft) return null;
   const editing = draft.editingId !== null;
@@ -63,7 +66,7 @@ export function EntrySheet() {
 
   const doSave = () => {
     saveEntry(values());
-    show('saved', `${editing ? '已改' : '已記'}一筆 ${formatNTD(amount ?? 0)}`);
+    show('saved', `${editing ? ENTRY.savedEdit : ENTRY.savedNew}${formatNTD(amount ?? 0)}`);
   };
 
   const trySave = () => {
@@ -177,6 +180,30 @@ export function EntrySheet() {
             </button>
           ))}
         </div>
+
+        {/* 掃描來的記錄：發票號碼與品項唯讀回看（一個月後看到 $437 想不起買了什麼就靠這個）。
+            預設收合——抽屜已經到 88dvh 了。沿用 scan.css 的樣式（它排在 entry.css 之後，
+            選擇器互不相干，零新 CSS）。
+            注意 itemsComplete 只存在於 ParsedInvoice、沒落到 ExpenseRecord，
+            所以這裡不能顯示「發票僅載部分品項」。 */}
+        {(record?.invoice || (record?.items?.length ?? 0) > 0) && (
+          <details className="scan-items">
+            <summary className="field-label">{ENTRY.invoiceSection}</summary>
+            {record?.invoice && (
+              <p className="dim-text inv-no tnum">
+                {SCAN.invNoLabel} {record.invoice.number}
+              </p>
+            )}
+            {record?.items?.map((it, i) => (
+              <div key={i} className="scan-item-row">
+                <span className="entry-title">{it.name}</span>
+                <span className="dim-text tnum">
+                  {it.qty} × {it.unitPrice}
+                </span>
+              </div>
+            ))}
+          </details>
+        )}
 
         <div className="modal-actions sheet-actions">
           {editing && (
