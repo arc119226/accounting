@@ -106,6 +106,36 @@
 }
 .cat-scroller .paper-label { flex-shrink: 0; min-height: 76px; }
 
+/* 常用備註籤條：同一套紙面語彙，但**躺平**——.paper-label 是直書 + min-height:76px，
+   在已經 88dvh 的抽屜裡再疊一排直書會吃掉 170px，六個字的備註還會變成一根柱子。 */
+.note-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 4px;
+  scrollbar-width: thin;
+}
+.note-chip {
+  flex-shrink: 0;
+  max-width: 10em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border: 1px solid #00000026;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--scroll-paper1), var(--scroll-paper2));
+  box-shadow: 0 2px 7px #0000004d;
+  color: var(--scroll-ink);
+  font-family: var(--font-brush);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, filter 0.15s ease;
+}
+.note-chip:hover { filter: brightness(1.06); }
+.note-chip.active { outline: 2px solid var(--scroll-zhu); outline-offset: 1px; }
+
 .sheet-actions { justify-content: space-between; }
 .save-btn { flex: 1; max-width: 260px; margin-left: auto; }
 

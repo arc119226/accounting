@@ -86,6 +86,18 @@ export function addMonths(month: string, delta: number): string {
   return `${String(y).padStart(4, '0')}-${pad2(m)}`;
 }
 
+/**
+ * 兩個 'YYYY-MM' 相差幾個月（to − from；同月 0、to 較早為負）。
+ * 與 addMonths 同一套「換算成總月數」的算術，跨年天生正確。
+ */
+export function monthsBetween(from: string, to: string): number {
+  const fy = Number(from.slice(0, 4));
+  const fm = Number(from.slice(5, 7));
+  const ty = Number(to.slice(0, 4));
+  const tm = Number(to.slice(5, 7));
+  return (ty * 12 + tm) - (fy * 12 + fm);
+}
+
 /** 月份 → 該月閉區間（查當月記錄用）：'2026-02' → {from:'2026-02-01', to:'2026-02-28'} */
 export function monthRange(month: string): DateRange {
   return { from: `${month}-01`, to: `${month}-${pad2(daysInMonth(month))}` };

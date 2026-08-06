@@ -7,6 +7,7 @@ import {
   isValidISODate,
   monthOf,
   monthRange,
+  monthsBetween,
   rocToISO,
 } from '../src/rocdate';
 
@@ -135,6 +136,23 @@ describe('property：addMonths 結合律', () => {
         },
       ),
     );
+  });
+});
+
+describe('property：monthsBetween 是 addMonths 的反函式', () => {
+  it('monthsBetween(m, addMonths(m, d)) === d（含跨年、負值）', () => {
+    fc.assert(
+      fc.property(arbMonth, fc.integer({ min: -1000, max: 1000 }), (m, d) => {
+        expect(monthsBetween(m, addMonths(m, d))).toBe(d);
+      }),
+    );
+  });
+
+  it('同月 0、反向取負、跨年進位', () => {
+    expect(monthsBetween('2026-08', '2026-08')).toBe(0);
+    expect(monthsBetween('2026-08', '2026-07')).toBe(-1);
+    expect(monthsBetween('2025-12', '2026-01')).toBe(1);
+    expect(monthsBetween('2025-08', '2026-08')).toBe(12);
   });
 });
 

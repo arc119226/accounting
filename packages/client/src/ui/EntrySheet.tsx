@@ -3,8 +3,8 @@
  * 金額走自製數字鍵盤（整數元；行動裝置系統鍵盤會蓋半屏又常彈小數）。
  * 重複防呆：同日同額同人 → ConfirmDialog 警告不硬擋。
  */
-import { useState } from 'react';
-import { formatNTD, sortCategories } from '@zhangben/core';
+import { useMemo, useState } from 'react';
+import { formatNTD, monthOf, sortCategories, suggestNotes } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
 import { getPersonId } from '../ids';
 import { sortPersonsForTabs } from '../personView';
@@ -41,6 +41,15 @@ export function EntrySheet() {
   // 編輯掃描來的記錄時把原列撈出來看發票號碼與品項（EntryDraft 只帶 7 個可編輯欄位）。
   // 窄 selector：記錄物件參考在該列沒變動時是穩定的，訂閱成本可忽略
   const record = useAppStore((s) => (draft?.editingId ? s.records.get(draft.editingId) : undefined));
+  const records = useAppStore((s) => s.records);
+
+  // 常用備註籤條：手機上打字最貴，而日常開支的備註本來就高度重複。
+  // minCount=2＝「要打過兩次才算常用」，順帶讓掃描的品項自動備註（幾乎每張都獨一無二）
+  // 永遠上不了榜。records 每次變動都換新 Map，當 useMemo 的 dep 是可靠的
+  const noteChips = useMemo(
+    () => suggestNotes(records.values(), categoryId, monthOf(todayISO()), 6, 2),
+    [records, categoryId],
+  );
 
   if (!draft) return null;
   const editing = draft.editingId !== null;
@@ -156,6 +165,21 @@ export function EntrySheet() {
               maxLength={40}
               onChange={(e) => setNote(e.target.value)}
             />
+            {noteChips.length > 0 && (
+              <div className="note-chips">
+                {noteChips.map((s) => (
+                  <button
+                    key={s.note}
+                    type="button"
+                    className={`note-chip${note === s.note ? ' active' : ''}`}
+                    // 再點一次＝取消（與分類籤條同一套手感）
+                    onClick={() => setNote((cur) => (cur === s.note ? '' : s.note))}
+                  >
+                    {s.note}
+                  </button>
+                ))}
+              </div>
+            )}
             <label className="field-label">{ENTRY.merchantLabel}</label>
             <input
               className="text-input"
