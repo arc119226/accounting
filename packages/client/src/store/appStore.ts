@@ -1,18 +1,24 @@
 /**
  * App 單一 store（sr2 gameStore 模式：單 store + slices，手動持久化）。
- * M0 只有殼層狀態（screen 切換）；M1 起以 slice 擴充（ledger/stats/sync/settings），
  * slice 以 `import type { AppStore }` 反向引用（type-only=編譯期抹除，不成值循環）。
+ * 選取一律窄 selector（`useAppStore((s) => s.xxx)`），不取整個 store。
  */
 import { create } from 'zustand';
+import { createLedgerSlice, type LedgerSlice } from './ledgerSlice';
+import { createSettingsSlice, type SettingsSlice } from './settingsSlice';
 
 export type Screen = 'ledger' | 'scan' | 'stats' | 'sync' | 'settings' | 'categories';
 
-export interface AppStore {
+export interface ShellSlice {
   screen: Screen;
   setScreen(screen: Screen): void;
 }
 
-export const useAppStore = create<AppStore>((set) => ({
+export type AppStore = ShellSlice & LedgerSlice & SettingsSlice;
+
+export const useAppStore = create<AppStore>()((set, get, store) => ({
   screen: 'ledger',
   setScreen: (screen) => set({ screen }),
+  ...createLedgerSlice(set, get, store),
+  ...createSettingsSlice(set, get, store),
 }));

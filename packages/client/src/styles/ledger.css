@@ -1,0 +1,114 @@
+/* 主帳頁：月份導覽、兩人小計、日分組清單、記一筆 FAB */
+.ledger-body { padding-bottom: 90px; /* FAB 讓位 */ touch-action: pan-y; }
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.month-arrow { font-size: 20px; min-width: 44px; }
+.month-banner { display: flex; align-items: baseline; gap: 10px; }
+.month-total { font-size: 13px; color: var(--scroll-ink-dim); letter-spacing: 0; }
+
+.person-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.person-card .money-amount { text-align: right; }
+
+.day-group {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 #fff7e2aa;
+  overflow: hidden;
+}
+.day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 14px 6px;
+  font-size: 13px;
+  color: var(--dim);
+  border-bottom: 1px dashed var(--line);
+  letter-spacing: 0.06em;
+}
+
+.entry-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  min-height: 48px;
+}
+.entry-row:last-child { border-bottom: none; }
+.entry-row:active { background: var(--press-veil); }
+
+/* 分類印章的資料驅動色：color-mix 65% 壓向墨色（宣紙上不刺眼） */
+.cat-seal {
+  color: color-mix(in srgb, var(--cat-color, var(--dim)) 65%, var(--text));
+  border-color: color-mix(in srgb, var(--cat-color, var(--dim)) 65%, var(--text));
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.entry-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.entry-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+.entry-sub {
+  font-size: 12px;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.einv-chip {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0 3px;
+  vertical-align: 1px;
+}
+.entry-amount { font-size: 16px; font-weight: 600; flex-shrink: 0; }
+
+.empty-hint { text-align: center; margin-top: 40px; letter-spacing: 0.1em; }
+
+/* 記一筆 FAB：底部導覽上方置中，硃砂印泥感 */
+.add-fab {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+  padding: 12px 34px;
+  border-radius: 24px;
+  font-family: var(--font-brush);
+  font-size: 18px;
+  letter-spacing: 0.2em;
+  box-shadow: 0 4px 16px #00000045;
+}
+.add-fab:active { transform: translateX(-50%) translateY(1px); }

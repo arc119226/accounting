@@ -1,20 +1,23 @@
 /**
  * App 殼：無 router——store 內 `screen` 字串切換 + `key={screen}` 重掛
  * 讓 `.screen` 的進場動畫（styles/base.css screenIn）每次換頁重播。
- * 底部四鈕（帳本/掃發票/統計/同步）+ 右上角設定；各屏 M1–M4 陸續實作。
+ * 底部四鈕（帳本/掃發票/統計/同步）+ 右上角設定；EntrySheet 是 overlay 不佔屏。
  */
 import { useState } from 'react';
 import { useAppStore, type Screen } from './store/appStore';
 import { AppToast } from './ui/AppToast';
 import { ConfirmDialog } from './ui/ConfirmDialog';
+import { LedgerScreen } from './ui/LedgerScreen';
+import { EntrySheet } from './ui/EntrySheet';
+import { CategoriesScreen } from './ui/CategoriesScreen';
+import { SettingsScreen } from './ui/SettingsScreen';
 import { APP, NAV, PLACEHOLDER } from './strings/ui';
 
-function PlaceholderScreen({ title }: { title: string }) {
-  // M0 佔位屏：驗證卷軸橫幅/印章/紙卡/按鈕/對話框樣式全鏈路
+function PlaceholderScreen() {
+  // M2–M4 陸續替換：驗證樣式全鏈路的暫用畫面
   const [confirmOpen, setConfirmOpen] = useState(false);
   return (
     <div className="screen-body">
-      <div className="scroll-banner">{title}</div>
       <div className="paper-card">
         <p className="dim-text">{PLACEHOLDER.wip}</p>
         <div className="modal-actions">
@@ -46,6 +49,7 @@ const NAV_ITEMS: readonly { readonly key: Screen; readonly label: string; readon
 export function App() {
   const screen = useAppStore((s) => s.screen);
   const setScreen = useAppStore((s) => s.setScreen);
+  const entryOpen = useAppStore((s) => s.entryDraft !== null);
 
   const title =
     screen === 'ledger' ? APP.name
@@ -71,7 +75,10 @@ export function App() {
             <span className="corner-seal">設</span>
           </button>
         </header>
-        <PlaceholderScreen title={title} />
+        {screen === 'ledger' ? <LedgerScreen />
+          : screen === 'categories' ? <CategoriesScreen />
+          : screen === 'settings' ? <SettingsScreen />
+          : <PlaceholderScreen />}
       </div>
       <nav className="bottom-nav">
         {NAV_ITEMS.map((it) => (
@@ -85,6 +92,8 @@ export function App() {
           </button>
         ))}
       </nav>
+      {/* key：每次開抽屜都以新 draft 重掛（EntrySheet 內部 state 以 draft 初始化） */}
+      {entryOpen && <EntrySheet key={String(useAppStore.getState().entryDraft?.editingId ?? 'new')} />}
       <AppToast />
     </div>
   );

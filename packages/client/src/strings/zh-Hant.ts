@@ -39,3 +39,64 @@ export const CRASH = {
 export const PLACEHOLDER = {
   wip: '此頁尚在鋪紙研墨…',
 } as const;
+
+export const LEDGER = {
+  emptyMonth: '本月尚無記錄，落筆自今日始。',
+  addEntry: '記一筆',
+  einvoiceChip: '電',
+  weekdays: ['週日', '週一', '週二', '週三', '週四', '週五', '週六'],
+  totalPrefix: '合計 ',
+} as const;
+
+export const ENTRY = {
+  titleNew: '記一筆',
+  titleEdit: '改一筆',
+  paidByLabel: '誰花的',
+  categoryLabel: '分類',
+  dateLabel: '日期',
+  today: '今天',
+  yesterday: '昨天',
+  pickDate: '選日期',
+  noteLabel: '備註',
+  notePlaceholder: '午餐、車票…',
+  merchantLabel: '店家',
+  merchantPlaceholder: '（可留白）',
+  save: '入帳',
+  delete: '刪除',
+  deleteTitle: '刪除這筆？',
+  deleteBody: '刪除後會在同步時一併從對方帳上移除。',
+  deleteConfirm: '刪除',
+  dupTitle: '疑似重複',
+  dupConfirm: '仍要入帳',
+  /** {note} 由呼叫端替換 */
+  dupBodyPrefix: '同日已有一筆同額記錄：',
+} as const;
+
+export const CATEGORIES = {
+  title: '分類管理',
+  addTitle: '新增分類',
+  namePlaceholder: '名稱',
+  glyphPlaceholder: '章',
+  add: '新增',
+  deleteTitle: '刪除分類？',
+  deleteBody: '既有記錄不受影響，仍以原分類顯示統計。',
+  deleteConfirm: '刪除',
+  builtinLock: '內建',
+  moveUp: '上移',
+  moveDown: '下移',
+} as const;
+
+export const SETTINGS = {
+  title: '設定',
+  whoAmI: '這支手機的主人',
+  namesLabel: '兩人稱呼',
+  nameA: '甲的稱呼',
+  nameB: '乙的稱呼',
+  categoriesLink: '分類管理',
+  storageTitle: '儲存空間',
+  persisted: '已向瀏覽器申請持久保存',
+  notPersisted: '尚未取得持久保存承諾——請常備份',
+  diagCopy: '複製診斷資訊',
+  diagCopied: '已複製',
+  versionPrefix: '版本 ',
+} as const;

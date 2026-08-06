@@ -1,0 +1,145 @@
+/* 記一筆底部抽屜：上滑進場、數字鍵盤、直書分類籤條、通用文字輸入 */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  display: flex;
+  align-items: flex-end;
+  z-index: 80;
+  animation: fadein 0.15s ease;
+}
+.entry-sheet {
+  width: 100%;
+  max-height: 88dvh;
+  overflow-y: auto;
+  background: var(--card);
+  border-top: 1px solid var(--line-gold);
+  border-radius: 18px 18px 0 0;
+  box-shadow: inset 0 1px 0 #fff7e2aa, 0 -8px 30px rgba(0, 0, 0, 0.35);
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: sheetUp 0.22s ease both;
+}
+@keyframes sheetUp {
+  from { transform: translateY(30%); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+
+.sheet-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.amount-display {
+  font-size: 40px;
+  font-weight: 700;
+  text-align: right;
+  padding: 2px 10px 6px;
+  border-bottom: 2px solid var(--line-gold);
+  font-family: var(--font-display);
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: 5fr 4fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.key-btn {
+  min-height: 52px;
+  font-size: 22px;
+  font-family: var(--font-display);
+  background: var(--card-elev);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.key-btn:active { background: var(--chip-active-bg); transform: translateY(1px); }
+.key-fn { color: var(--dim); font-size: 18px; }
+
+.entry-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.field-label {
+  font-size: 12px;
+  color: var(--dim);
+  letter-spacing: 0.15em;
+}
+
+.text-input {
+  font: inherit;
+  color: var(--text);
+  background: #fdf8ec;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 0;
+  width: 100%;
+}
+.text-input:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
+.text-input::placeholder { color: color-mix(in srgb, var(--dim) 60%, transparent); }
+
+/* 分類直書籤條橫向捲 */
+.cat-scroller {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  scrollbar-width: thin;
+}
+.cat-scroller .paper-label { flex-shrink: 0; min-height: 76px; }
+
+.sheet-actions { justify-content: space-between; }
+.save-btn { flex: 1; max-width: 260px; margin-left: auto; }
+
+/* 分類管理 */
+.cat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.cat-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-lock {
+  font-size: 11px;
+  color: var(--gold);
+  border: 1px solid var(--gold-hairline);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.cat-tools { display: flex; gap: 4px; align-items: center; }
+.cat-tool { min-width: 36px; padding: 6px 6px; font-size: 12px; }
+.cat-color-input {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.cat-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cat-add-row .text-input { flex: 1; min-width: 90px; width: auto; }
+.cat-glyph-input { max-width: 58px; text-align: center; flex: 0 0 auto; }
+
+/* 設定頁零碎 */
+.storage-line { line-height: 1.7; }
+.version-line { font-size: 12px; }

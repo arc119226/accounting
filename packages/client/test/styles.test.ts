@@ -25,6 +25,8 @@ const onDisk = fs.readdirSync(LEAF_DIR).filter((f) => f.endsWith('.css'));
 /** 後者在 import 順序中必須晚於前者（同特異性時 source order 決勝） */
 const AFTER: readonly (readonly [string, string, string])[] = [
   ['components.css', 'base.css', '元件依賴 base 的 tokens/@font-face 宣告'],
+  ['ledger.css', 'components.css', '.cat-seal 覆蓋 .seal-char、.month-banner 覆蓋 .scroll-banner'],
+  ['entry.css', 'components.css', '.cat-scroller .paper-label 尺寸覆蓋、.sheet-actions 覆蓋 .modal-actions'],
   ['dialogs.css', 'components.css', 'modal 內按鈕間距/覆蓋晚於元件定義'],
   ['toast.css', 'components.css', 'toast 內按鈕樣式晚於元件定義'],
   ['nav.css', 'components.css', 'nav 的 .screen 版面補充晚於元件定義'],
