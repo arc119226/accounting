@@ -27,6 +27,9 @@ export const NOTICE = {
   updateReady: '新版本已就緒',
   updateBtn: '重新整理',
   saveFailed: '設定保存失敗——變更僅在本次有效',
+  /** 刪除後接金額，配「復原」動作鈕 */
+  deletedPrefix: '已刪除 ',
+  undo: '復原',
 } as const;
 
 export const CRASH = {
@@ -62,6 +65,9 @@ export const ENTRY = {
   merchantLabel: '店家',
   merchantPlaceholder: '（可留白）',
   save: '入帳',
+  saveEdit: '改一筆',
+  saveAndNext: '入帳再記',
+  repeatToday: '照這筆再記今天',
   delete: '刪除',
   deleteTitle: '刪除這筆？',
   deleteBody: '刪除後會在同步時一併從對方帳上移除。',

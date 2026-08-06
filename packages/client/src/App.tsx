@@ -89,7 +89,11 @@ export function App() {
           </button>
         ))}
       </nav>
-      {/* key：每次開抽屜都以新 draft 重掛（EntrySheet 內部 state 以 draft 初始化） */}
+      {/* key 以 editingId 為準（EntrySheet 的本地 state 只在 mount 時以 draft 種值），
+          所以新增模式的 draft 一律共用 'new'——這是刻意的：連續記帳靠「entryDraft 始終非 null」
+          讓抽屜不重掛（重掛會播一次上滑動畫、也會捲回頂端）。代價是本地欄位得由
+          EntrySheet 自己清。另注意這裡是 render 期間的**未訂閱** getState() 讀取，
+          只有 entryOpen 翻轉時才會重算。 */}
       {entryOpen && <EntrySheet key={String(useAppStore.getState().entryDraft?.editingId ?? 'new')} />}
       {/* 首啟取名卡（hydrated 且未取名時蓋全屏） */}
       <NameGate />

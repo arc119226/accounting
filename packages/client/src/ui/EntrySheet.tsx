@@ -10,8 +10,8 @@ import { getPersonId } from '../ids';
 import { sortPersonsForTabs } from '../personView';
 import { findDuplicate, todayISO, type EntryValues } from '../store/ledgerSlice';
 import { ConfirmDialog } from './ConfirmDialog';
-import { ENTRY, SCAN } from '../strings/ui';
-import { show } from '../notice';
+import { ENTRY, NOTICE, SCAN } from '../strings/ui';
+import { show, showAction } from '../notice';
 
 const KEYPAD = ['7', '8', '9', '4', '5', '6', '1', '2', '3', 'C', '0', '⌫'] as const;
 const MAX_AMOUNT = 99_999_999;
@@ -27,6 +27,7 @@ export function EntrySheet() {
   const categories = useAppStore((s) => s.categories);
   const persons = useAppStore((s) => s.persons);
   const closeEntry = useAppStore((s) => s.closeEntry);
+  const openEntry = useAppStore((s) => s.openEntry);
   const saveEntry = useAppStore((s) => s.saveEntry);
   const deleteRecord = useAppStore((s) => s.deleteRecord);
 
@@ -37,7 +38,7 @@ export function EntrySheet() {
   const [merchantName, setMerchantName] = useState(draft?.merchantName ?? '');
   const [paidBy, setPaidBy] = useState<string>(draft?.paidBy ?? getPersonId());
   const [showDatePick, setShowDatePick] = useState(false);
-  const [confirm, setConfirm] = useState<'none' | 'dup' | 'delete'>('none');
+  const [confirm, setConfirm] = useState<'none' | 'dup' | 'dupKeep' | 'delete'>('none');
   // 編輯掃描來的記錄時把原列撈出來看發票號碼與品項（EntryDraft 只帶 7 個可編輯欄位）。
   // 窄 selector：記錄物件參考在該列沒變動時是穩定的，訂閱成本可忽略
   const record = useAppStore((s) => (draft?.editingId ? s.records.get(draft.editingId) : undefined));
@@ -73,15 +74,22 @@ export function EntrySheet() {
     paidBy,
   });
 
-  const doSave = () => {
-    saveEntry(values());
+  const doSave = (keepOpen = false) => {
+    saveEntry(values(), keepOpen);
     show('saved', `${editing ? ENTRY.savedEdit : ENTRY.savedNew}${formatNTD(amount ?? 0)}`);
+    if (!keepOpen) return;
+    // 抽屜沒重掛（store 的 draft 一直非 null），所以本地欄位得自己清。
+    // **店名也要清**，儘管 backlog 只說金額備註：LedgerScreen 的標題是
+    // merchant?.name || note || 分類名，黏著的店名會直接變成下一筆不相干記錄的標題。
+    setAmount(null);
+    setNote('');
+    setMerchantName('');
   };
 
-  const trySave = () => {
+  const trySave = (keepOpen = false) => {
     const dup = findDuplicate(useAppStore.getState().records, values(), draft.editingId);
-    if (dup) return setConfirm('dup');
-    doSave();
+    if (dup) return setConfirm(keepOpen ? 'dupKeep' : 'dup');
+    doSave(keepOpen);
   };
 
   const dupHint = (() => {
@@ -230,24 +238,45 @@ export function EntrySheet() {
         )}
 
         <div className="modal-actions sheet-actions">
-          {editing && (
-            <button className="danger-btn" onClick={() => setConfirm('delete')}>
-              {ENTRY.delete}
+          {editing ? (
+            <>
+              <button className="danger-btn" onClick={() => setConfirm('delete')}>
+                {ENTRY.delete}
+              </button>
+              {/* 照這筆再記今天：同樣的店同樣的錢，換個日期再記一次（每週買菜、每天停車）。
+                  payload 用**當下的本地 state**而非原記錄——使用者可能先改了金額才決定要再記一筆。
+                  必須同時 setDate：App.tsx 的 key 是 render 期間的未訂閱 getState() 讀取，
+                  重掛與不重掛兩條路都可能發生，兩條都得成立。 */}
+              <button
+                className="ghost-btn"
+                onClick={() => {
+                  const today = todayISO();
+                  openEntry({ editingId: null, amount, date: today, categoryId, note, merchantName, paidBy });
+                  setDate(today);
+                }}
+              >
+                {ENTRY.repeatToday}
+              </button>
+            </>
+          ) : (
+            // 入帳再記：存完不關抽屜，保留日期/分類/人。單筆記帳仍走右邊那顆＝零額外點擊
+            <button className="ghost-btn" disabled={!amount} onClick={() => trySave(true)}>
+              {ENTRY.saveAndNext}
             </button>
           )}
-          <button className="primary-btn save-btn" disabled={!amount} onClick={trySave}>
-            {ENTRY.save}
+          <button className="primary-btn save-btn" disabled={!amount} onClick={() => trySave()}>
+            {editing ? ENTRY.saveEdit : ENTRY.save}
           </button>
         </div>
 
         {/* 確認框必須在 .entry-sheet（有 stopPropagation）內：
             放在 overlay 層當兄弟會讓「點對話框」冒泡到 sheet-overlay 直接關掉整個抽屜 */}
-        {confirm === 'dup' && (
+        {(confirm === 'dup' || confirm === 'dupKeep') && (
           <ConfirmDialog
             title={ENTRY.dupTitle}
             body={dupHint}
             confirmLabel={ENTRY.dupConfirm}
-            onConfirm={() => { setConfirm('none'); doSave(); }}
+            onConfirm={() => { const keep = confirm === 'dupKeep'; setConfirm('none'); doSave(keep); }}
             onCancel={() => setConfirm('none')}
           />
         )}
@@ -257,7 +286,15 @@ export function EntrySheet() {
             body={ENTRY.deleteBody}
             confirmLabel={ENTRY.deleteConfirm}
             danger
-            onConfirm={() => deleteRecord(draft.editingId!)}
+            onConfirm={() => {
+              const removed = deleteRecord(draft.editingId!);
+              if (!removed) return;
+              showAction(`${NOTICE.deletedPrefix}${formatNTD(removed.amount)}`, {
+                label: NOTICE.undo,
+                // getState()：deleteRecord 已經把抽屜關掉了，不能靠元件作用域裡的訂閱值
+                run: () => useAppStore.getState().restoreRecord(removed),
+              });
+            }}
             onCancel={() => setConfirm('none')}
           />
         )}
