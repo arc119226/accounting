@@ -12,7 +12,7 @@
 - `packages/client`（@zhangben/client）— React 18 + Vite + Zustand PWA。
   - 無 router：store 內 `screen` 字串 + App.tsx 切換 + `key={screen}` 重播進場動畫
   - Zustand 單 store + slices，手動 localStorage/IDB 持久化（無 persist middleware）
-  - `db/repo.ts` 是 IndexedDB 唯一寫入口；合併邏輯只住 core/merge.ts（全 app 僅此一份）
+  - `db/repo.ts` 是 IndexedDB 唯一寫入口；合併**決策**只住 `sync/applyCore.ts`（core mergeAll+reconcile 的唯一呼叫點，P2P 與檔案匯入共用）——決策在 zustand 函式型 set 內**同步**完成、落盤後置（快照競態防線，見審查修復 commit）
   - `strings/zh-Hant.ts` 是顯示文字正典（零 import 葉檔，ESLint 強制）
 
 ## 鐵律
