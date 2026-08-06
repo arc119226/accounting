@@ -98,6 +98,9 @@ export function CategoriesScreen() {
 
   const [name, setName] = useState('');
   const [glyph, setGlyph] = useState('');
+  /* 這個 hex **刻意不收編成 token**：它長得像樣式，實際上是使用者資料——
+     不動色輪就按新增時，它會原封寫進 Category.color、經 HLC 同步到對方手機。
+     token 是主題的東西，會跟著夜墨變；帳本裡的分類顏色不能因為換主題就變。 */
   const [color, setColor] = useState('#b3502d');
   const [deleting, setDeleting] = useState<string | null>(null);
 

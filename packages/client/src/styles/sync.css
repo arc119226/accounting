@@ -10,7 +10,7 @@
   height: 220px;
   border: 1px solid var(--line-gold);
   border-radius: 8px;
-  background: #fdf8ec;
+  background: var(--fixed-qr-paper);
   padding: 6px;
 }
 .qr-loading { display: flex; align-items: center; justify-content: center; }

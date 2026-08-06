@@ -10,7 +10,7 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  background: #14100a; /* 相機起流前的墨底（不是紙色：取景器語境） */
+  background: var(--fixed-vf-bg); /* 相機起流前的墨底（不是紙色：取景器語境） */
   border-radius: 12px;
   /* .scan-body 不是 .screen-body，拿不到 nav.css 的安全區內距——橫放時瀏海會壓到取景器 */
   margin: 0 max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
@@ -36,9 +36,9 @@
 .scan-target {
   width: min(34vw, 150px);
   aspect-ratio: 1;
-  border: 2.5px solid #efe4c6cc;
+  border: 2.5px solid var(--fixed-vf-frame);
   border-radius: 8px;
-  box-shadow: 0 0 0 2000px rgba(10, 8, 4, 0.28); /* 外圍壓暗聚焦 */
+  box-shadow: var(--fixed-vf-scrim); /* 外圍壓暗聚焦 */
   clip-path: inset(-4px round 8px);
 }
 
@@ -54,15 +54,15 @@
   max-width: 100%;
   margin: 8px 0 0;
   padding: 6px 16px;
-  background: #efe6d2e6;
-  border: 1px solid #b08d57;
+  background: var(--fixed-vf-hint-bg);
+  border: 1px solid var(--fixed-vf-hint-line);
   border-radius: 999px;
-  color: #2c2318;
+  color: var(--fixed-vf-hint-ink);
   font-size: 13px;
   letter-spacing: 0.08em;
   text-align: center;
 }
-.scan-hint.denied { background: #f6e2de; border-color: var(--scroll-zhu); color: #6b1d12; }
+.scan-hint.denied { background: var(--fixed-vf-hint-bg-denied); border-color: var(--scroll-zhu); color: var(--fixed-vf-hint-ink-denied); }
 
 .scan-controls {
   display: flex;

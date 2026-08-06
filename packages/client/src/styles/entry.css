@@ -24,7 +24,7 @@
   background: var(--card);
   border-top: 1px solid var(--line-gold);
   border-radius: 18px 18px 0 0;
-  box-shadow: inset 0 1px 0 #fff7e2aa, 0 -8px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--sheen), var(--shadow-sheet);
   padding: 0; /* 內距下放到三段各自身上：頭尾要自己畫滿整幅，捲動區要能捲到邊 */
   display: flex;
   flex-direction: column;
@@ -49,8 +49,8 @@
   min-height: max(44px, 2.75em); /* 沒有刪除鈕時也維持同高，新增/編輯兩模式不跳版 */
 }
 /* 刪除走硃砂印章語彙而非灰框：抽屜裡唯一不可逆的操作要看得出來 */
-.sheet-head-row .corner-btn { border-color: var(--red); }
-.sheet-head-row .corner-seal { color: var(--red); }
+.sheet-head-row .corner-btn { border-color: var(--red-ink); }
+.sheet-head-row .corner-seal { color: var(--red-ink); }
 
 /* 全抽屜唯一的捲動區。min-height:0 是必要條件——flex item 的 min-height:auto 會擋住收縮，
    少了它就變成整個抽屜溢出、頭尾一起被推出去。 */
@@ -142,7 +142,7 @@
 .text-input {
   font: inherit;
   color: var(--text);
-  background: #fdf8ec;
+  background: var(--field-bg);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
@@ -179,10 +179,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 6px 10px;
-  border: 1px solid #00000026;
+  border: 1px solid var(--tag-line);
   border-radius: 3px;
   background: linear-gradient(180deg, var(--scroll-paper1), var(--scroll-paper2));
-  box-shadow: 0 2px 7px #0000004d;
+  box-shadow: var(--shadow-tag);
   color: var(--scroll-ink);
   font-family: var(--font-brush);
   font-size: 13px;

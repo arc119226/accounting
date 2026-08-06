@@ -241,6 +241,8 @@ export const SETTINGS = {
   iosInstallTitle: '安裝到主畫面',
   iosInstallBody: '用 Safari 開啟本頁 → 點「分享」→「加入主畫面」。安裝後帳本資料更不易被瀏覽器回收，開啟也更快。',
   myNameLabel: '我的稱呼（同步後對方看到的名字）',
+  themeTitle: '紙色（只改這台，不同步）',
+  themeOptions: { system: '跟隨系統', paper: '宣紙', ink: '夜墨' },
   categoriesLink: '分類管理',
   storageTitle: '儲存空間',
   persisted: '已向瀏覽器申請持久保存',

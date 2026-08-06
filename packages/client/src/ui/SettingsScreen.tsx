@@ -9,6 +9,8 @@ import { getStorageInfo, type StorageInfo } from '../db/persist';
 import { readErrLog } from '../errlog';
 import { APP_VERSION } from '../version';
 import { show } from '../notice';
+import { applyTheme } from '../theme';
+import type { ThemePref } from '../settings';
 import { BUDGET, NAV, SETTINGS } from '../strings/ui';
 
 function BudgetCard() {
@@ -168,6 +170,33 @@ function MyNameCard() {
   );
 }
 
+/** 主題三段切換。本機設定、不同步——一個人想用夜墨另一個想用宣紙是完全正常的。 */
+function ThemeCard() {
+  const theme = useAppStore((s) => s.settings.theme);
+  const updateSettings = useAppStore((s) => s.updateSettings);
+  const pick = (t: ThemePref): void => {
+    updateSettings({ theme: t });
+    applyTheme(t); // 立刻生效：主題是「按了就要看見」的設定，不該等下次開 app
+  };
+  return (
+    <div className="paper-card">
+      <div className="field-label">{SETTINGS.themeTitle}</div>
+      <div className="seg">
+        {(['system', 'paper', 'ink'] as const).map((t) => (
+          <button
+            key={t}
+            className={`seg-btn${theme === t ? ' active' : ''}`}
+            aria-pressed={theme === t}
+            onClick={() => pick(t)}
+          >
+            {SETTINGS.themeOptions[t]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsScreen() {
   const setScreen = useAppStore((s) => s.setScreen);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
@@ -180,6 +209,8 @@ export function SettingsScreen() {
   return (
     <div className="screen-body">
       <MyNameCard />
+
+      <ThemeCard />
 
       <BudgetCard />
 

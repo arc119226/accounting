@@ -210,4 +210,258 @@ describe('styles barrel（順序即契約）', () => {
     expect(checked, 'CSS 裡一個站內 url() 都沒掃到 ⇒ 這條測試等於沒在測').toBeGreaterThan(0);
     expect(missing).toEqual([]);
   });
+
+  /* ─────────────── 顏色 token（夜墨主題 BACKLOG #10 的地基） ─────────────── */
+
+  /** 裸色值：#rgb / #rrggbb(aa) / rgb(a)() / hsl(a)()。transparent 與 currentColor 不算 */
+  const BARE_COLOR = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/;
+  const strip = (s: string): string => s.replace(/\/\*[\s\S]*?\*\//g, '');
+  /** :root 定義的 token（base.css 是唯一的定義點） */
+  const rootTokens = new Set(
+    [...strip(leaf('base.css')).matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((m) => m[1]!),
+  );
+  /**
+   * 不在 base.css 定義、但確實有人餵值的 token：
+   * --kb 由 keyboard.ts 於執行期寫入；--card-accent 與 --cat-color 由元件內聯注入。
+   */
+  const RUNTIME_TOKENS = new Set(['--kb', '--card-accent', '--cat-color']);
+
+  it('葉檔不准出現裸色值——顏色一律住 base.css 的 :root', () => {
+    // 收編前這裡有 46 處（其中 17 處藏在 box-shadow 裡）。夜墨主題換的是 :root 那一份，
+    // 任何逃逸到葉檔的裸色都會在換主題時原地不動 ⇒ 那一塊區域直接瞎掉。
+    const bad: string[] = [];
+    for (const name of onDisk) {
+      if (name === 'base.css') continue;
+      strip(leaf(name))
+        .split('\n')
+        .forEach((line, i) => {
+          if (BARE_COLOR.test(line)) bad.push(`${name}:${i + 1}  ${line.trim()}`);
+        });
+    }
+    expect(bad).toEqual([]);
+    // 防真空：同一條正則套在 base.css 上必須大量命中，否則就是正則寫壞了而不是真的乾淨
+    const inBase = strip(leaf('base.css')).split('\n').filter((l) => BARE_COLOR.test(l)).length;
+    expect(inBase, '連 base.css 都掃不到裸色 ⇒ BARE_COLOR 正則壞了，上面那條等於沒在測').toBeGreaterThan(20);
+  });
+
+  it('每個 var(--x) 都要有定義（打錯字的 var 會靜靜地什麼都不畫）', () => {
+    const bad: string[] = [];
+    const check = (label: string, body: string): void => {
+      for (const m of body.matchAll(/var\(\s*(--[\w-]+)/g)) {
+        const t = m[1]!;
+        if (!rootTokens.has(t) && !RUNTIME_TOKENS.has(t)) bad.push(`${label}: ${t}`);
+      }
+    };
+    for (const name of onDisk) check(name, strip(leaf(name)));
+    const walkTs = (dir: string): string[] =>
+      fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? walkTs(path.join(dir, e.name))
+          : /\.tsx?$/.test(e.name) ? [path.join(dir, e.name)] : [],
+      );
+    for (const f of walkTs(path.join(DIR, '../src'))) check(path.basename(f), fs.readFileSync(f, 'utf8'));
+    expect([...new Set(bad)]).toEqual([]);
+  });
+
+  it('沒有死 token——定義了卻沒人用的顏色會在夜墨那輪誤導人', () => {
+    let all = '';
+    for (const name of onDisk) all += strip(leaf(name));
+    const walkTs = (dir: string): string[] =>
+      fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? walkTs(path.join(dir, e.name))
+          : /\.tsx?$/.test(e.name) ? [path.join(dir, e.name)] : [],
+      );
+    for (const f of walkTs(path.join(DIR, '../src'))) all += fs.readFileSync(f, 'utf8');
+    const used = new Set([...all.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]!));
+    const dead = [...rootTokens].filter((t) => !used.has(t) && !RUNTIME_TOKENS.has(t));
+    expect(dead).toEqual([]);
+  });
+
+  it('固定組 --fixed-* 不得被任何 [data-theme] 區塊覆寫（讀者是相機，不是人眼）', () => {
+    // QR 的 quiet zone 與取景器疊在實時影像上——它們變深就是「掃不到」與「瞄不準」，
+    // 是正確性不是品味。夜墨主題那輪加 :root[data-theme='ink'] 時，這條會擋住順手一起改。
+    const bad: string[] = [];
+    for (const name of onDisk) {
+      const body = strip(leaf(name));
+      for (const m of body.matchAll(/\[data-theme[^{]*\{([^}]*)\}/g)) {
+        for (const t of m[1]!.matchAll(/(--fixed-[\w-]+)\s*:/g)) bad.push(`${name}: ${t[1]}`);
+      }
+    }
+    expect(bad).toEqual([]);
+    // 同時確認固定組真的存在——沒有它就沒東西可守
+    expect([...rootTokens].filter((t) => t.startsWith('--fixed-')).length).toBeGreaterThan(0);
+  });
+
+  /* ─────────────── 夜墨主題 ─────────────── */
+
+  /** 從 base.css 抽出某個選擇器區塊的 token（值原樣，含註解已剝） */
+  const blockTokens = (selector: string): Map<string, string> => {
+    const css = strip(leaf('base.css'));
+    const esc = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const body = new RegExp(`^${esc}\\s*\\{([\\s\\S]*?)^\\}`, 'm').exec(css)?.[1] ?? '';
+    const out = new Map<string, string>();
+    for (const m of body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) out.set(m[1]!, m[2]!.trim());
+    return out;
+  };
+  const paperTokens = blockTokens(':root');
+  const inkTokens = blockTokens(":root[data-theme='ink']");
+  /** 非顏色、或不歸主題管的 token */
+  const NOT_THEMED = (t: string): boolean =>
+    t === '--kb' || t.startsWith('--font-') || t.startsWith('--fixed-');
+
+  it('主題化 token 兩區塊必須對稱（夜墨漏一顆＝那塊區域在墨底下瞎掉）', () => {
+    expect(inkTokens.size, '夜墨區塊沒解析到 token').toBeGreaterThan(30);
+    const shouldBeThemed = [...paperTokens.keys()].filter((t) => !NOT_THEMED(t));
+    // 值本身就是純 var(--x) 的（例如 --person-1: var(--gold)）會自動跟著它引用的 token 走，
+    // 在夜墨重寫一次反而是多一個會漂移的真相 ⇒ 豁免
+    const followsAlias = (t: string): boolean => /^var\(--[\w-]+\)$/.test(paperTokens.get(t) ?? '');
+    const missing = shouldBeThemed.filter((t) => !inkTokens.has(t) && !followsAlias(t));
+    expect(missing, '這些 token 在夜墨區塊沒有對應值').toEqual([]);
+    // 反向：夜墨不准憑空多出宣紙沒有的 token（那在宣紙下會是死值）
+    const extra = [...inkTokens.keys()].filter((t) => !paperTokens.has(t));
+    expect(extra, '夜墨區塊多出宣紙沒有的 token').toEqual([]);
+  });
+
+  it('夜墨區塊必須宣告 color-scheme: dark（表單控制項與捲軸才會跟著變）', () => {
+    const css = strip(leaf('base.css'));
+    const body = /^:root\[data-theme='ink'\]\s*\{([\s\S]*?)^\}/m.exec(css)?.[1] ?? '';
+    expect(body).toMatch(/color-scheme:\s*dark/);
+  });
+
+  /* ── WCAG 對比度。使用者眼睛不好（會把系統字調到最大），這條不是形式。 ── */
+  type RGB = readonly [number, number, number];
+  const parseColor = (v: string): { rgb: RGB; a: number } | null => {
+    const h = /^#([0-9a-f]{3,8})$/i.exec(v.trim());
+    if (h) {
+      let s = h[1]!;
+      if (s.length === 3 || s.length === 4) s = [...s].map((c) => c + c).join('');
+      const n = (i: number): number => parseInt(s.slice(i * 2, i * 2 + 2), 16);
+      return { rgb: [n(0), n(1), n(2)], a: s.length === 8 ? n(3) / 255 : 1 };
+    }
+    const r = /^rgba?\(([^)]+)\)$/i.exec(v.trim());
+    if (r) {
+      const p = r[1]!.split(',').map((x) => Number(x.trim()));
+      return { rgb: [p[0]!, p[1]!, p[2]!], a: p[3] ?? 1 };
+    }
+    return null;
+  };
+  /** 半透明前景疊到底色上（toast 底就是帶 alpha 的） */
+  const composite = (fg: { rgb: RGB; a: number }, bg: RGB): RGB =>
+    [0, 1, 2].map((i) => fg.rgb[i]! * fg.a + bg[i]! * (1 - fg.a)) as unknown as RGB;
+  const lum = (c: RGB): number => {
+    const ch = c.map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * ch[0]! + 0.7152 * ch[1]! + 0.0722 * ch[2]!;
+  };
+  const ratio = (a: RGB, b: RGB): number => {
+    const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p) as [number, number];
+    return (x + 0.05) / (y + 0.05);
+  };
+  /** 漸層取最不利的那一站（拿所有 hex 都算一遍取最小比值） */
+  const stops = (v: string): string[] => v.match(/#[0-9a-f]{3,8}\b/gi) ?? [v];
+
+  /**
+   * [前景, 背景, 下限, 為什麼是這個下限, 夜墨的下限（可選）]
+   * 第 5 欄存在時代表**夜墨要求得更嚴**——夜墨沒有「維持既有外觀」的包袱，
+   * 能做到的就該做到，不該被宣紙的現況拖著。
+   */
+  const PAIRS: readonly (readonly [string, string, number, string, number?])[] = [
+    ['--text', '--bg', 7, '正文壓在底色上，目標 AAA'],
+    ['--text', '--card', 7, '正文壓在紙卡上，目標 AAA'],
+    ['--dim', '--card', 4.5, '次要文字（.dim-text）＝正文尺寸，AA'],
+    ['--dim', '--bg', 4.5, '同上，直接壓在底色'],
+    ['--scroll-ink', '--scroll-paper2', 4.5, '卷軸橫幅的月份字'],
+    ['--money-ink', '--money-face', 4.5, '小計卡金額'],
+    ['--nag-ink', '--nag-bg', 4.5, '備份提醒'],
+    ['--toast-ink', '--toast-bg', 4.5, 'toast 文字（底帶 alpha，會先疊到 --bg 上）'],
+    ['--toast-btn-ink', '--toast-btn-bg', 4.5, '復原鈕——刪錯了要按的就是它'],
+    ['--on-danger', '--red', 4.5, '刪除鈕的白字'],
+    ['--red-ink', '--card', 4.5, '印章字/危險前景'],
+    ['--scroll-zhu', '--card', 4.5, '.over-red 超支金額'],
+    // --gold 幾乎只當 UI 用（hairline、鈕邊框、長條圖的條），唯一的文字用途是
+    // .chart-tick.focus——而那個「焦點」同時靠 font-weight:700 表達，未聚焦的刻度是
+    // --dim（過 4.5）。資訊不靠顏色單獨承載 ⇒ 按 UI 元件的 3:1。
+    // **記在案**：宣紙下這對只有 3.69，夜墨下 7.86。要真的補到 4.5 得動宣紙的金色，
+    // 那會連 hairline 與長條圖一起改，不屬於這一輪。
+    ['--gold', '--bg', 3, 'UI 用途為主；唯一的文字用途另有粗體佐證'],
+    ['--accent', '--bg', 3, 'accent 多用在邊框與 active 態＝UI 元件，3:1'],
+    ['--accent-ink', '--accent-lo', 4.5, '主要鈕的字（漸層下緣）'],
+    // 宣紙的漸層上緣只有 3.70——16px/800 不是 WCAG 的大字（要 18.66px 粗體），
+    // 嚴格說該 4.5。不動宣紙是刻意的（既有使用者每天在看），但夜墨沒有這個包袱。
+    ['--accent-ink', '--accent-hi', 3, '宣紙現況 3.70，記在案', 4.5],
+  ];
+
+  for (const [themeName, tokens] of [['宣紙', paperTokens], ['夜墨', inkTokens]] as const) {
+    it(`${themeName}：關鍵配對的對比度達標`, () => {
+      const bgTok = tokens.get('--bg') ?? paperTokens.get('--bg')!;
+      const pageBg = parseColor(bgTok)!.rgb;
+      const val = (t: string): string => tokens.get(t) ?? paperTokens.get(t)!;
+      const fails: string[] = [];
+      for (const [fgT, bgT, paperMin, why, inkMin] of PAIRS) {
+        const min = themeName === '夜墨' ? (inkMin ?? paperMin) : paperMin;
+        const fg = parseColor(val(fgT));
+        if (!fg) { fails.push(`${fgT} 解析不出顏色`); continue; }
+        // 前景與背景都可能帶 alpha 或是漸層——各站都算，取最不利的
+        let worst = Infinity;
+        for (const s of stops(val(bgT))) {
+          const b = parseColor(s);
+          if (!b) continue;
+          const bgRgb = composite(b, pageBg);
+          worst = Math.min(worst, ratio(composite(fg, bgRgb), bgRgb));
+        }
+        if (worst < min) fails.push(`${fgT} on ${bgT} = ${worst.toFixed(2)} < ${min}（${why}）`);
+      }
+      expect(fails).toEqual([]);
+    });
+  }
+
+  it('開機底色：index.html 與 manifest 必須等於 base.css 的 --bg / --text', () => {
+    // 這三處在 CSS 載入**之前**就要生效，天生用不了 var()。漏改一處的症狀是
+    // 「夜墨使用者開 app 先閃一下白紙」——上線後才看得到、而且只有第一秒。
+    const tokenVal = (name: string): string =>
+      new RegExp(`^\\s*${name}\\s*:\\s*([^;]+);`, 'm').exec(strip(leaf('base.css')))?.[1]?.trim() ?? '';
+    const bg = tokenVal('--bg');
+    const text = tokenVal('--text');
+    expect(bg, '--bg 沒讀到').toMatch(/^#[0-9a-f]{6}$/i);
+    expect(text, '--text 沒讀到').toMatch(/^#[0-9a-f]{6}$/i);
+
+    const html = fs.readFileSync(path.join(DIR, '../index.html'), 'utf8');
+    const themeColor = /<meta\s+name="theme-color"\s+content="([^"]+)"/.exec(html)?.[1];
+    expect(themeColor?.toLowerCase(), 'index.html 的 theme-color').toBe(bg.toLowerCase());
+    const boot = /body\s*\{[^}]*\}/.exec(html)?.[0] ?? '';
+    expect(boot, '首漆內聯樣式沒找到 body 規則').toContain('background');
+    expect(new RegExp(`background:\\s*${bg}\\b`, 'i').test(boot), `首漆 background 應為 ${bg}`).toBe(true);
+    expect(new RegExp(`color:\\s*${text}\\b`, 'i').test(boot), `首漆 color 應為 ${text}`).toBe(true);
+
+    const mani = JSON.parse(fs.readFileSync(path.join(DIR, '../public/manifest.webmanifest'), 'utf8')) as {
+      background_color?: string;
+      theme_color?: string;
+    };
+    // manifest 是安裝後的啟動畫面，沒有執行期——固定跟預設（宣紙）走
+    expect(mani.background_color?.toLowerCase(), 'manifest background_color').toBe(bg.toLowerCase());
+    expect(mani.theme_color?.toLowerCase(), 'manifest theme_color').toBe(bg.toLowerCase());
+  });
+
+  it('夜墨的首漆色：index.html 的內聯樣式與 script 必須等於夜墨的 --bg / --text', () => {
+    // 首漆跑在 CSS 之前，用不了 var()，只能手抄一份——漏改的症狀是「夜墨使用者
+    // 每次開 app 先閃一下白紙」，只有第一秒看得到，最需要機器守著。
+    const inkBg = inkTokens.get('--bg')!;
+    const inkText = inkTokens.get('--text')!;
+    expect(inkBg).toMatch(/^#[0-9a-f]{6}$/i);
+    const html = fs.readFileSync(path.join(DIR, '../index.html'), 'utf8');
+    const rule = /html\[data-theme='ink'\]\s*body\s*\{[^}]*\}/.exec(html)?.[0];
+    expect(rule, "index.html 少了 html[data-theme='ink'] body 的首漆規則").toBeTruthy();
+    expect(new RegExp(`background:\\s*${inkBg}\\b`, 'i').test(rule!), `首漆 background 應為 ${inkBg}`).toBe(true);
+    expect(new RegExp(`color:\\s*${inkText}\\b`, 'i').test(rule!), `首漆 color 應為 ${inkText}`).toBe(true);
+    // script 裡那份 theme-color 也是手抄的
+    const script = /<script>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
+    expect(script, '首漆 script 沒找到').toContain('data-theme');
+    expect(new RegExp(`['"]${inkBg}['"]`, 'i').test(script), `script 的 theme-color 應為 ${inkBg}`).toBe(true);
+    // 解析規則必須與 theme.ts 的 resolveTheme 同義（script 是它的手抄本）
+    expect(script).toContain("pref === 'ink'");
+    expect(script).toContain('prefers-color-scheme: dark');
+  });
 });

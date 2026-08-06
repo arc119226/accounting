@@ -13,8 +13,13 @@
   font-display: swap;
 }
 
-/* 宣紙水墨 tokens（sr2 .theme-paper 提升為 :root 預設——本 app 純紙面主題，無暗色模式）：
-   亮宣紙底、深墨字、玉青 accent、暗金 hairline、硃砂強調 */
+/* 宣紙水墨 tokens（sr2 .theme-paper 提升為 :root 預設）：
+   亮宣紙底、深墨字、玉青 accent、暗金 hairline、硃砂強調。
+
+   **顏色一律住在這裡**：葉檔不准出現任何裸色值（test/styles.test.ts 機器強制）。
+   這是夜墨主題（BACKLOG #10）的地基——換主題＝換這一份，葉檔一行都不用動。
+   命名講**用途**不講顏色：`--nag-ink` 在墨底下會變成淺色，叫 `--brown-6b4c1d` 就成了謊話。
+   下面分五節：面與墨 / 卷軸 / 陰影與高光 / 元件角色色 / 固定組。 */
 :root {
   color-scheme: light;
   /* 軟鍵盤吃掉的視窗高（src/keyboard.ts 於執行期改寫）。iOS Safari 不縮版面視窗、
@@ -31,9 +36,15 @@
   --dim: #6e6046;
   --accent: #1f6e58;
   --accent-ink: #f6f0dd;
+  /* 硃砂鈕上的字。不叫 --white：墨底下它會變深色 */
+  --on-danger: #fff;
   --gold: #8a6a2f;
   --gold-bright: #a5813a;
+  /* 硃砂拆兩顆：--red 當**底**（danger 鈕的面，上面壓白字）、--red-ink 當**前景**
+     （印章字、危險邊框）。宣紙下同值，換到墨底就非拆不可——底色要夠深白字才讀得到，
+     前景要夠亮才在近黑上讀得到，一顆 token 滿足不了相反的兩個要求。 */
   --red: #a83226;
+  --red-ink: #a83226;
   --accent-hi: #2f8a6e;
   --accent-lo: #1f6e58;
   --accent-glow: #1f6e5833;
@@ -52,6 +63,158 @@
   --scroll-ink-dim: #6b5a3c;
   --scroll-zhu: #a8321f;
   --scroll-rod: linear-gradient(90deg, #3a2c16, #7a5f30 42%, #d8b25c 56%, #5a4522 100%);
+  /* 卷軸紙的上下緣：一亮一暗做出厚度，**不可合併成同一顆** */
+  --scroll-edge-hi: #c7ab6e;
+  --scroll-edge-lo: #8a6f3a;
+
+  /* ── 陰影與高光 ──
+     token 存**整條 box-shadow 值**而不是只存顏色。理由是夜墨底下要換的往往不是顏色而是
+     一整套做法（改用亮色 inset、改用邊框、或整個拿掉）——只 token 化顏色會把幾何寫死在
+     每個使用點上，換主題時還是得回去改十幾支葉檔。
+     多層陰影在使用端用逗號組合：`box-shadow: var(--sheen), var(--shadow-modal)`。 */
+  --sheen: inset 0 1px 0 #fff7e2aa;        /* 紙面頂部高光；4 支葉檔原本各寫一份、位元相同 */
+  --sheen-strong: inset 0 1px 0 #fff7e2cc; /* 卷軸紙面（刻意比 --sheen 強） */
+  --sheen-gold: inset 0 0 2px #ffe9b055;   /* 木軸鎏金反光 */
+  --shadow-btn: 0 2px 8px #00000030;
+  --shadow-tag: 0 2px 7px #0000004d;       /* 直書籤條與備註籤條原本位元相同 */
+  --shadow-tag-hover: 0 3px 12px #00000066;
+  --shadow-banner: 0 3px 10px #00000066;   /* 與 --shadow-tag-hover 同色但幾何不同，不合併 */
+  --shadow-rod: 0 1px 5px #000000aa;
+  --shadow-card: 0 6px 20px rgba(0, 0, 0, 0.25);
+  --shadow-fab: 0 4px 16px #00000045;
+  --shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.35);
+  --shadow-toast: 0 4px 18px rgba(0, 0, 0, 0.35);
+  --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.4);
+
+  /* ── 元件角色色 ── */
+  --field-bg: #fdf8ec;                     /* 輸入框紙底。與 --fixed-qr-paper 同值但**不同群** */
+  --tag-line: #00000026;                   /* 籤條類的細邊（直書籤條 + 備註籤條） */
+  --money-face: linear-gradient(168deg, #f5efdf, #ece2cb);
+  --money-ink: #2c2417;
+  --money-line: rgba(90, 70, 40, 0.45);
+  --money-accent: #b08a4f;                 /* 小計卡頂色條的預設；LedgerScreen 以 --card-accent 覆寫 */
+  /* 「紙訊息」三件套：備份提醒與 toast 共用邊框，底與墨各自保留現值
+     （--nag-bg 不透明、--toast-bg 帶 f2，疊在 --bg 上實際只差藍通道 1/255——
+     這一輪的規矩是零像素變動，合併留給夜墨那輪一起重選） */
+  --note-line: #b08d57;
+  --nag-bg: #efe6d2;
+  --nag-ink: #6b4c1d;
+  --toast-bg: #efe6d2f2;
+  --toast-ink: #2c2318;
+  --toast-btn-bg: #d9b96e;
+  --toast-btn-line: #8a6a3b;
+  --toast-btn-ink: #241a0d;
+  /* 人物色階：帳本的兩人小計卡與統計的拔河條本來各寫一份，其實是同一組
+     （小計卡第一人的 #8a6a2f 就是 --gold）。收成一組，兩邊都讀這裡。 */
+  --person-1: var(--gold);
+  --person-2: #3d6b8e;
+  --person-3: #2e7d64;
+  --person-4: #7d5a8e;
+
+  /* ── 固定組：讀者不是人眼，主題切換一律不動 ──
+     這是**正確性而非品味**：QR 的 quiet zone 讀者是對方的相機、取景器疊在實時影像上、
+     基準是相機視野。任何 [data-theme] 區塊都不准出現 --fixed-*（test/styles.test.ts 機器強制）。
+     它們也進 token 而不是留裸 hex——留裸 hex 正是當初逃逸的原因，下一個人只會再「順手統一」一次。
+     注意 --fixed-vf-hint-line 與 --note-line 同值、--fixed-vf-hint-ink 與 --toast-ink 同值，
+     但刻意分屬兩群：toast 會跟著主題變，取景器提示條不會。只看色值去合併就會出事。 */
+  --fixed-qr-paper: #fdf8ec;
+  --fixed-vf-bg: #14100a;
+  --fixed-vf-frame: #efe4c6cc;
+  --fixed-vf-scrim: 0 0 0 2000px rgba(10, 8, 4, 0.28);
+  --fixed-vf-hint-bg: #efe6d2e6;
+  --fixed-vf-hint-line: #b08d57;
+  --fixed-vf-hint-ink: #2c2318;
+  --fixed-vf-hint-bg-denied: #f6e2de;
+  --fixed-vf-hint-ink-denied: #6b1d12;
+}
+
+/* ══ 夜墨（拓本墨）══
+   概念是**拓本**而不是「現代深色模式」：白字黑地本來就是中文傳統裡真實存在的器物，
+   所以這裡是把宣紙翻面，不是把顏色反相。暖黑底（#17140f，硯台的墨色）讓既有的金、
+   硃砂、鎏金木軸整套語彙原封可用——換成藍調底的話，那些都得重想。
+
+   三條規矩：
+   1. **只覆寫主題化 token，一顆 --fixed-* 都不准出現**（styles.test.ts 機器強制）。
+      QR 的 quiet zone 與取景器讀者是相機，變深就是「掃不到」與「瞄不準」。
+   2. **陰影不能只換顏色**：黑陰影在近黑底上等於消失。深色下的層次主要靠「面比底亮」
+      （--card 亮於 --bg）來讀，陰影的角色退成邊緣的暈——所以 alpha 一律加重。
+   3. **紙面高光（--sheen）要壓下來**：宣紙下 67% 的白線是「紙的厚度」，
+      墨底下同樣一條線會變成刺眼的白邊。降到 12%～20%。
+
+   對比度以 styles.test.ts 逐對驗算（使用者眼睛不好，這條不是形式）。 */
+:root[data-theme='ink'] {
+  color-scheme: dark;
+  --bg: #17140f;
+  --bg-grad: radial-gradient(1100px 700px at 50% -10%, #241f16 0%, #17140f 60%);
+  --card: #211c15;
+  --card-elev: #2b251b;
+  --line: #3f382a;
+  --line-gold: #a8873f;
+  --text: #ece2cc;
+  --dim: #a89877;
+  --accent: #4fa387;
+  /* 主要鈕的漸層**壓得比宣紙暗**。原本想直接沿用宣紙的值，量了才發現宣紙那組
+     白字壓在玉青上只有 3.70:1（16px/800 不算 WCAG 的大字，門檻是 4.5）——
+     夜墨底下沒有「維持現況」的包袱，壓暗一階就拿到 4.85:1。
+     鈕本身對近黑底仍有 3.38:1 的輪廓，找得到。宣紙那邊不動：那是既有使用者
+     每天在看的樣子，不在這一輪的範圍。 */
+  --accent-hi: #24705a;
+  --accent-lo: #185742;
+  --accent-ink: #f6f0dd;
+  --on-danger: #fff;
+  --gold: #c9a250;
+  --gold-bright: #dcb765;
+  --red: #b93d2c;      /* 底：白字壓上去 5.6:1 */
+  --red-ink: #e2705a;  /* 前景：印章字在紙卡上 5.6:1 */
+  --accent-glow: #4fa38740;
+  --seg-active-bg: #4fa38726;
+  --chip-active-bg: #47391f;
+  /* 按壓回饋在墨底要**提亮**而不是壓暗——黑上加黑等於沒反應 */
+  --press-veil: #ffffff14;
+  --scrim: #000000d9;
+  --gold-hairline: #c9a2504d;
+  /* 卷軸：紙變深、墨字變亮，硃砂印章要在近黑上仍然跳出來 */
+  --scroll-paper1: #322a1c;
+  --scroll-paper2: #241e14;
+  --scroll-ink: #f0e4c9;
+  --scroll-ink-dim: #bdaa87;
+  --scroll-zhu: #e0664c;
+  --scroll-rod: linear-gradient(90deg, #241a0d, #56421f 42%, #ab8740 56%, #3a2c16 100%);
+  --scroll-edge-hi: #6d5a35;
+  --scroll-edge-lo: #14100a;
+  /* 高光壓下來、陰影加重（見上面第 2、3 條） */
+  --sheen: inset 0 1px 0 #fff7e21f;
+  --sheen-strong: inset 0 1px 0 #fff7e233;
+  --sheen-gold: inset 0 0 2px #ffe9b038;
+  --shadow-btn: 0 2px 8px #00000073;
+  --shadow-tag: 0 2px 7px #00000099;
+  --shadow-tag-hover: 0 3px 12px #000000b8;
+  --shadow-banner: 0 3px 10px #000000b8;
+  --shadow-rod: 0 1px 5px #000000d9;
+  --shadow-card: 0 6px 20px rgba(0, 0, 0, 0.6);
+  --shadow-fab: 0 4px 16px #00000099;
+  --shadow-sheet: 0 -8px 30px rgba(0, 0, 0, 0.75);
+  --shadow-toast: 0 4px 18px rgba(0, 0, 0, 0.75);
+  --shadow-modal: 0 12px 40px rgba(0, 0, 0, 0.8);
+  /* 輸入框比紙卡再深一階＝凹進去；宣紙下是比紙卡更亮，方向相反但語意相同 */
+  --field-bg: #14110b;
+  --tag-line: #ffffff26;
+  --money-face: linear-gradient(168deg, #2c2519, #201b12);
+  --money-ink: #f0e6cf;
+  --money-line: rgba(214, 186, 132, 0.28);
+  --money-accent: #c9a250;
+  --note-line: #8a6f3a;
+  --nag-bg: #2b2215;
+  --nag-ink: #e2c68d;
+  --toast-bg: #2b2215f2;
+  --toast-ink: #ece2cc;
+  --toast-btn-bg: #5c4b25;
+  --toast-btn-line: #a8873f;
+  --toast-btn-ink: #f2e5c4;
+  /* --person-1 是 var(--gold)，會自動跟著上面的 --gold 走，不必也不該在這裡重寫 */
+  --person-2: #6fa3cc;
+  --person-3: #5cb497;
+  --person-4: #b08cc4;
 }
 
 body {
