@@ -21,6 +21,12 @@ export interface PeerHello {
   readonly hlcNow: string;
   /** 物理牆鐘 ms：UI 比對兩機時鐘差 >10 分鐘出警示 */
   readonly wallMs: number;
+  /**
+   * 我方記錄的各 peer checkpoint 表（peerDeviceId → lastSyncedAt）。
+   * **接收端決定 since**（審查修正 #17）：傳送端改用「對方表裡記的我」當增量基準——
+   * 對方 IDB 被回收而重來時此表為空 ⇒ 自動退全量重送，舊帳補得回來。
+   */
+  readonly checkpoints: Readonly<Record<string, string>>;
 }
 
 export type SyncMsg =
@@ -36,6 +42,8 @@ export type SyncEvent =
   | { readonly e: 'msg'; readonly msg: SyncMsg }
   | { readonly e: 'sent-all'; readonly totalSent: number }
   | { readonly e: 'applied'; readonly kind: SyncKind; readonly summary: MergeSummary; readonly deduped: number }
+  /** 套用落盤失敗：**不可**偽裝成 applied——那會讓協定完成、checkpoint 照存、該批永久遺失 */
+  | { readonly e: 'apply-failed' }
   | { readonly e: 'timeout' }
   | { readonly e: 'cancel' };
 
@@ -48,7 +56,7 @@ export type SyncEffect =
   | { readonly f: 'leave' };
 
 export type SyncPhase = 'waiting' | 'exchanging' | 'done' | 'error' | 'cancelled';
-export type SyncError = 'no-peer' | 'stalled' | 'peer-left';
+export type SyncError = 'no-peer' | 'stalled' | 'peer-left' | 'apply-failed';
 
 export interface SyncTotals {
   readonly added: number;
@@ -67,6 +75,13 @@ export interface SyncSession {
   readonly sent: number;
   readonly receivedBatches: number;
   readonly appliedBatches: number;
+  /**
+   * 完整性驗證（審查修正 #7）：wire 層（trystero backpressure 10s 逾時）會**靜默截斷**
+   * 訊息且送方 resolve 成功——只憑批次數對不出丟批。收列數必須追上對方 done 宣告的
+   * totalSent 才准 ack；否則雙方 stall timeout=可重試錯誤、不存 checkpoint。
+   */
+  readonly receivedRows: number;
+  readonly expectedRows: number | null;
   /** 對方資料套進本地的累計摘要（唯一外顯的合併結果） */
   readonly totals: SyncTotals;
   /** 完成握手旗標 */
@@ -85,6 +100,8 @@ export function makeSession(my: PeerHello): SyncSession {
     sent: 0,
     receivedBatches: 0,
     appliedBatches: 0,
+    receivedRows: 0,
+    expectedRows: null,
     totals: { added: 0, updated: 0, skipped: 0, deletes: 0, deduped: 0 },
     sentDone: false,
     gotDone: false,
@@ -99,10 +116,15 @@ export function checkpointOf(a: PeerHello, b: PeerHello): string {
 }
 
 function maybeFinish(s: SyncSession): [SyncSession, SyncEffect[]] {
-  // ack 條件：對方 done 已到、且到的批都套完
+  // ack 條件：對方 done 已到、到的批都套完、**且實收列數對得上對方宣告**（丟批偵測）
   const effects: SyncEffect[] = [];
   let next = s;
-  if (next.gotDone && !next.sentAck && next.appliedBatches >= next.receivedBatches) {
+  if (
+    next.gotDone &&
+    !next.sentAck &&
+    next.appliedBatches >= next.receivedBatches &&
+    next.receivedRows >= (next.expectedRows ?? 0)
+  ) {
     next = { ...next, sentAck: true };
     effects.push({ f: 'send', msg: { t: 'ack' } });
   }
@@ -140,6 +162,13 @@ export function syncReduce(s: SyncSession, ev: SyncEvent): [SyncSession, SyncEff
       return [
         { ...s, phase: 'error', error: s.phase === 'waiting' ? 'no-peer' : 'stalled' },
         [{ f: 'leave' }],
+      ];
+
+    case 'apply-failed':
+      // 本側落盤壞了：發 bye 讓對側走 error 路徑，雙方都不存 checkpoint → 下次重送
+      return [
+        { ...s, phase: 'error', error: 'apply-failed' },
+        [{ f: 'send', msg: { t: 'bye' } }, { f: 'leave' }],
       ];
 
     case 'cancel':
@@ -184,13 +213,17 @@ export function syncReduce(s: SyncSession, ev: SyncEvent): [SyncSession, SyncEff
         case 'batch': {
           if (!s.peer) return [s, []]; // hello 前的 batch=協定違規，忽略
           return [
-            { ...s, receivedBatches: s.receivedBatches + 1 },
+            {
+              ...s,
+              receivedBatches: s.receivedBatches + 1,
+              receivedRows: s.receivedRows + ev.msg.rows.length,
+            },
             [{ f: 'apply', kind: ev.msg.kind, rows: ev.msg.rows }],
           ];
         }
         case 'done': {
           if (!s.peer) return [s, []];
-          return maybeFinish({ ...s, gotDone: true });
+          return maybeFinish({ ...s, gotDone: true, expectedRows: ev.msg.totalSent });
         }
         case 'ack': {
           if (!s.peer) return [s, []];

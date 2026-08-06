@@ -59,6 +59,7 @@ export function SyncScreen() {
     session?.error === 'no-peer' ? SYNC.errNoPeer
     : session?.error === 'stalled' ? SYNC.errStalled
     : session?.error === 'peer-left' ? SYNC.errPeerLeft
+    : session?.error === 'apply-failed' ? SYNC.errApplyFailed
     : null;
 
   return (

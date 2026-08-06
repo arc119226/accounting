@@ -22,6 +22,7 @@ function hello(device: string, hlc: string): PeerHello {
     personNames: { A: '甲', B: '乙' },
     hlcNow: hlc,
     wallMs: 1000,
+    checkpoints: {},
   };
 }
 
@@ -176,5 +177,44 @@ describe('sync 協定（雙 reducer 對打）', () => {
     expect(fx.every((f) => !(f.f === 'send' && f.msg.t === 'ack'))).toBe(true);
     [s, fx] = syncReduce(s, { e: 'applied', kind: 'records', summary: SUM, deduped: 0 });
     expect(fx.some((f) => f.f === 'send' && f.msg.t === 'ack')).toBe(true);
+  });
+
+  it('丟批偵測：wire 截斷一批（實收列數 < done.totalSent）⇒ 永不 ack，timeout 收 stalled、不存 checkpoint', () => {
+    const b = makeSim('bbb', '000000000000011-0000-bbb', []);
+    const h = hello('aaa', '000000000000010-0000-aaa');
+    let [s] = syncReduce(b.s, { e: 'msg', msg: { t: 'hello', hello: h } });
+    // 對方送了 2 批共 3 列，第一批（2 列）被 wire 靜默截斷——只收到第二批
+    let fx: SyncEffect[];
+    [s, fx] = syncReduce(s, { e: 'msg', msg: { t: 'batch', kind: 'records', rows: [row('r3')], seq: 2 } });
+    [s] = syncReduce(s, { e: 'applied', kind: 'records', summary: SUM, deduped: 0 });
+    [s, fx] = syncReduce(s, { e: 'msg', msg: { t: 'done', totalSent: 3 } });
+    // 列數對不上：批次都套完了也不准 ack
+    expect(s.receivedRows).toBe(1);
+    expect(s.expectedRows).toBe(3);
+    expect(fx.every((f) => !(f.f === 'send' && f.msg.t === 'ack'))).toBe(true);
+    // stall timeout → 可重試錯誤；效果裡沒有 save-checkpoint
+    const [s2, fx2] = syncReduce(s, { e: 'timeout' });
+    expect(s2.phase).toBe('error');
+    expect(s2.error).toBe('stalled');
+    expect(fx2.every((f) => f.f !== 'save-checkpoint')).toBe(true);
+  });
+
+  it('apply-failed：落盤壞掉 ⇒ error + bye + leave，不存 checkpoint；對面收 bye 也走 error', () => {
+    const b = makeSim('bbb', '000000000000011-0000-bbb', []);
+    const h = hello('aaa', '000000000000010-0000-aaa');
+    let [s] = syncReduce(b.s, { e: 'msg', msg: { t: 'hello', hello: h } });
+    [s] = syncReduce(s, { e: 'msg', msg: { t: 'batch', kind: 'records', rows: [row('r1')], seq: 1 } });
+    const [s2, fx] = syncReduce(s, { e: 'apply-failed' });
+    expect(s2.phase).toBe('error');
+    expect(s2.error).toBe('apply-failed');
+    expect(fx.some((f) => f.f === 'send' && f.msg.t === 'bye')).toBe(true);
+    expect(fx.some((f) => f.f === 'leave')).toBe(true);
+    expect(fx.every((f) => f.f !== 'save-checkpoint')).toBe(true);
+    // 對面（交換中）收到 bye → peer-left 錯誤、同樣不存 checkpoint
+    const a = makeSim('aaa', '000000000000010-0000-aaa', []);
+    const [sa] = syncReduce(a.s, { e: 'msg', msg: { t: 'hello', hello: hello('bbb', '000000000000011-0000-bbb') } });
+    const [sa2, fxa] = syncReduce(sa, { e: 'msg', msg: { t: 'bye' } });
+    expect(sa2.phase).toBe('error');
+    expect(fxa.every((f) => f.f !== 'save-checkpoint')).toBe(true);
   });
 });

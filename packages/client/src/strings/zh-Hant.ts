@@ -127,6 +127,7 @@ export const SYNC = {
   errNoPeer: '等不到對方——確認雙方都有網路，或改用檔案備份。',
   errStalled: '連線中斷了——已套用的資料不受影響，再試一次即可。',
   errPeerLeft: '對方離開了——已套用的資料不受影響，再試一次即可。',
+  errApplyFailed: '這台裝置儲存失敗——這次同步不算數，請重試（若持續發生請檢查儲存空間）。',
   clockDriftWarn: '兩機時間相差超過 10 分鐘，合併結果會以時間較快的一方為準。',
   summaryAdded: '新增',
   summaryUpdated: '更新',

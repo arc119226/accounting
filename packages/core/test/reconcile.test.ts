@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { reconcileInvoiceDuplicates } from '../src/reconcile';
+import { reconcileInvoiceDuplicates, type FreshEnvelope } from '../src/reconcile';
 import type { ExpenseRecord } from '../src/types';
+
+const ENV: FreshEnvelope = { updatedAt: '000000000000099-0000-fresh', deviceId: 'fresh' };
 
 function rec(over: Partial<ExpenseRecord> & { id: string }): ExpenseRecord {
   return {
@@ -21,36 +23,42 @@ function rec(over: Partial<ExpenseRecord> & { id: string }): ExpenseRecord {
 const toMap = (rows: ExpenseRecord[]) => new Map(rows.map((r) => [r.id, r]));
 
 describe('reconcileInvoiceDuplicates', () => {
-  it('無重複=原 Map 原樣回傳（零配置）', () => {
+  it('無重複且無帶號墓碑=原 Map 原樣回傳（零配置）', () => {
     const m = toMap([
       rec({ id: 'a', invoice: { number: 'AB11111111', randomCode: '1' } }),
       rec({ id: 'b', invoice: { number: 'AB22222222', randomCode: '2' } }),
       rec({ id: 'c' }),
     ]);
-    const { next, deduped } = reconcileInvoiceDuplicates(m);
+    const { next, deduped } = reconcileInvoiceDuplicates(m, ENV);
     expect(next).toBe(m);
     expect(deduped).toBe(0);
   });
 
-  it('同號兩筆：id 小者存活，敗者轉墓碑且剝除 invoice', () => {
+  it('同號兩筆：id 小者存活，敗者轉墓碑、剝除 invoice、**換上新信封**（新事件才能同步收斂）', () => {
     const inv = { number: 'AB11111111', randomCode: '1' };
     const m = toMap([rec({ id: 'b', invoice: inv, amount: 200 }), rec({ id: 'a', invoice: inv, amount: 100 })]);
-    const { next, deduped } = reconcileInvoiceDuplicates(m);
+    const { next, deduped } = reconcileInvoiceDuplicates(m, ENV);
     expect(deduped).toBe(1);
     expect(next.get('a')!.deleted).toBe(false);
     const loser = next.get('b')!;
     expect(loser.deleted).toBe(true);
     expect(loser.invoice).toBeUndefined();
-    expect(loser.amount).toBe(200); // 其餘欄位不動（信封也不動）
-    expect(loser.updatedAt).toBe('000000000000001-0000-x');
+    expect(loser.amount).toBe(200); // 內容欄位不動
+    // 信封必須是 fresh：沿用舊信封=同信封不同內容，mergeRow 會誤判 identical
+    expect(loser.updatedAt).toBe(ENV.updatedAt);
+    expect(loser.deviceId).toBe(ENV.deviceId);
   });
 
-  it('墓碑不參與分組（已刪的同號記錄不影響活記錄）', () => {
+  it('自癒：帶 invoice 的墓碑被剝號並換新信封（釋放 unique index、可傳播）', () => {
     const inv = { number: 'AB11111111', randomCode: '1' };
     const m = toMap([rec({ id: 'a', invoice: inv, deleted: true }), rec({ id: 'b', invoice: inv })]);
-    const { next, deduped } = reconcileInvoiceDuplicates(m);
-    expect(deduped).toBe(0);
-    expect(next.get('b')!.deleted).toBe(false);
+    const { next, deduped } = reconcileInvoiceDuplicates(m, ENV);
+    expect(deduped).toBe(0); // 純剝號不算去重
+    const healed = next.get('a')!;
+    expect(healed.deleted).toBe(true);
+    expect(healed.invoice).toBeUndefined();
+    expect(healed.updatedAt).toBe(ENV.updatedAt);
+    expect(next.get('b')!.deleted).toBe(false); // 活記錄不受墓碑影響
   });
 
   const arbRecords = fc
@@ -77,14 +85,18 @@ describe('reconcileInvoiceDuplicates', () => {
       return m;
     });
 
-  it('property：調和後活記錄的發票號碼唯一、存活者是同號中最小 id、冪等、決定論', () => {
+  it('property：調和後活號碼唯一、存活者=同號最小 id、無帶號墓碑、冪等、決定論（固定信封下）', () => {
     fc.assert(
       fc.property(arbRecords, (m) => {
-        const { next } = reconcileInvoiceDuplicates(m);
-        // 活號碼唯一
+        const { next } = reconcileInvoiceDuplicates(m, ENV);
+        // 活號碼唯一 + 墓碑一律無 invoice
         const seen = new Map<string, string>();
         for (const r of next.values()) {
-          if (r.deleted || !r.invoice) continue;
+          if (r.deleted) {
+            expect(r.invoice, `墓碑 ${r.id} 仍帶 invoice`).toBeUndefined();
+            continue;
+          }
+          if (!r.invoice) continue;
           expect(seen.has(r.invoice.number), `號碼 ${r.invoice.number} 重複`).toBe(false);
           seen.set(r.invoice.number, r.id);
         }
@@ -97,13 +109,13 @@ describe('reconcileInvoiceDuplicates', () => {
         for (const [num, ids] of groups) {
           expect(seen.get(num)).toBe([...ids].sort()[0]);
         }
-        // 冪等
-        const twice = reconcileInvoiceDuplicates(next);
+        // 冪等（同信封重跑=無事可做）
+        const twice = reconcileInvoiceDuplicates(next, ENV);
         expect(twice.deduped).toBe(0);
         expect(twice.next).toBe(next);
         // 決定論：打亂插入序結果相同
         const shuffled = new Map([...m.entries()].reverse());
-        const again = reconcileInvoiceDuplicates(shuffled);
+        const again = reconcileInvoiceDuplicates(shuffled, ENV);
         expect(new Map(again.next)).toEqual(new Map(next));
       }),
     );

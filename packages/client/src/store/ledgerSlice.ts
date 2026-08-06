@@ -115,6 +115,21 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
         rules: loaded.rules,
         budget: loaded.budget,
       });
+      // 種回時鐘（審查修正）：localStorage 的 HLC 可能寫失敗（隱私模式/配額滿），
+      // 牆鐘又可能被回撥——以帳本內最大 updatedAt 種回，保證後續 mint 嚴格大於
+      // 一切既存時間戳，單機單調性不再依賴 localStorage 可寫
+      let maxHlc = '';
+      const all: Iterable<{ updatedAt: string }>[] = [
+        loaded.records.values(),
+        loaded.categories.values(),
+        loaded.rules.values(),
+        loaded.budget ? [loaded.budget] : [],
+      ];
+      for (const it of all) for (const r of it) if (r.updatedAt > maxHlc) maxHlc = r.updatedAt;
+      if (maxHlc) {
+        const { seedClock } = await import('../clock');
+        seedClock(maxHlc);
+      }
     } catch (err) {
       // IDB 開不起來（隱私模式/損毀）：以空帳本+內建分類啟動，至少可看可記（不落盤）
       logError(`hydrate: ${String(err)}`);
@@ -201,7 +216,11 @@ export const createLedgerSlice: StateCreator<AppStore, [], [], LedgerSlice> = (s
     const s = get();
     const existing = s.records.get(id);
     if (!existing || existing.deleted) return;
-    const row: ExpenseRecord = { ...existing, deleted: true, updatedAt: tickClock(), deviceId: getDeviceId() };
+    // 墓碑必須剝除 invoice（審查修正）：留著號碼會佔住 by-invoice unique index——
+    // 重掃同張發票會被落盤拒絕、同步收到對方同號活記錄時整批 tx 炸掉
+    const { invoice: _dropped, ...rest } = existing;
+    void _dropped;
+    const row: ExpenseRecord = { ...rest, deleted: true, updatedAt: tickClock(), deviceId: getDeviceId() };
     const records = new Map(s.records);
     records.set(id, row);
     set({ records, entryDraft: null });

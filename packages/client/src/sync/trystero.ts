@@ -40,9 +40,7 @@ export function makeRoomCode(): string {
 export interface SyncDeps {
   /** 殼要串流的本地資料（呼叫當下的快照） */
   getLocalRows(kind: SyncKind): readonly Syncable[];
-  /** 對端 checkpoint 查詢（無此 peer=''=全量） */
-  getSinceFor(peerDeviceId: string): string;
-  /** 套用一批（repo.applyIncoming + store swap），回累計摘要素材 */
+  /** 套用一批（同步決策 set + 落盤），失敗必須 throw（走 apply-failed，不存 checkpoint） */
   applyBatch(kind: SyncKind, rows: readonly Syncable[]): Promise<{ summary: { added: number; updated: number; skipped: number; deletes: number }; deduped: number }>;
   /** 吸收對端時鐘 + 檔案化 checkpoint */
   onPeerHello(peer: PeerHello): void;
@@ -94,7 +92,9 @@ export function startSync(code: string, my: PeerHello, deps: SyncDeps): SyncHand
           break;
         case 'stream-batches': {
           deps.onPeerHello(fx.peer);
-          const since = deps.getSinceFor(fx.peer.deviceId);
+          // **接收端決定 since**：用對方 hello 表裡「記到我」的 checkpoint 當增量基準。
+          // 對方 IDB 重灌時表為空 ⇒ 自動全量重送（合併冪等=零成本），舊帳補得回來。
+          const since = fx.peer.checkpoints[my.deviceId] ?? '';
           void (async () => {
             let total = 0;
             let seq = 0;
@@ -122,9 +122,10 @@ export function startSync(code: string, my: PeerHello, deps: SyncDeps): SyncHand
               const r = await deps.applyBatch(kind, rows);
               dispatch({ e: 'applied', kind, summary: r.summary, deduped: r.deduped });
             } catch (err) {
-              // 套用失敗（IDB 壞）：記錄後仍回報 applied（零摘要），否則 ack 永遠等不到
+              // 落盤失敗**不可**偽裝成 applied——協定會照樣完成並存 checkpoint，
+              // 該批資料從此永不重送。走 apply-failed=error、不存 checkpoint、下次重送。
               logError(`sync apply: ${String(err)}`);
-              dispatch({ e: 'applied', kind, summary: { added: 0, updated: 0, skipped: rows.length, deletes: 0 }, deduped: 0 });
+              dispatch({ e: 'apply-failed' });
             }
           });
           break;
@@ -143,6 +144,12 @@ export function startSync(code: string, my: PeerHello, deps: SyncDeps): SyncHand
     if (closed && ev.e !== 'cancel') return;
     const [next, effects] = syncReduce(session, ev);
     session = next;
+    // join 發條只保護 waiting 相位：對方 join 了卻沒送到 hello（立即斷線）時，
+    // 45 秒 no-peer 逾時必須仍然有效——不能在 onPeerJoin 就繳械
+    if (session.phase !== 'waiting' && joinTimer) {
+      clearTimeout(joinTimer);
+      joinTimer = null;
+    }
     // 有任何往來就重上發條（終局態不再計時）
     if (session.phase === 'exchanging') armStall();
     deps.onState(session);
@@ -160,16 +167,16 @@ export function startSync(code: string, my: PeerHello, deps: SyncDeps): SyncHand
     );
     // trystero 0.25 API：makeAction 回物件、onPeerJoin/onPeerLeave 是可指派屬性。
     // SyncMsg 是自家介面（結構上就是 JSON），對 DataPayload 的名義檢查以 cast 過橋。
+    // 慢鏈路上的大批次傳輸以 onProgress/onReceiveProgress 逐 chunk 重上發條——
+    // 「還在動的傳輸」不是 stall；20 秒只在真正雙向失聲時觸發。
     const action = room.makeAction('m');
-    sendMsg = (msg) => void action.send(msg as never);
+    sendMsg = (msg) => void action.send(msg as never, { onProgress: () => armStall() });
+    action.onReceiveProgress = () => armStall();
     action.onMessage = (data) => {
       armStall();
       dispatch({ e: 'msg', msg: data as unknown as SyncMsg });
     };
-    room.onPeerJoin = () => {
-      if (joinTimer) clearTimeout(joinTimer);
-      dispatch({ e: 'peer-join' });
-    };
+    room.onPeerJoin = () => dispatch({ e: 'peer-join' });
     room.onPeerLeave = () => dispatch({ e: 'peer-leave' });
     joinTimer = setTimeout(() => dispatch({ e: 'timeout' }), JOIN_TIMEOUT_MS);
     deps.onState(session);

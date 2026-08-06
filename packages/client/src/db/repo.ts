@@ -6,13 +6,10 @@
  * 記憶體狀態已更新、IDB 沒跟上時使用者必須知道（帳本不能靜默掉筆）。
  */
 import {
-  mergeAll,
-  reconcileInvoiceDuplicates,
   seedCategories,
   type Budget,
   type Category,
   type ExpenseRecord,
-  type MergeSummary,
   type MerchantRule,
   type Syncable,
 } from '@zhangben/core';
@@ -71,39 +68,22 @@ export async function putBudget(row: Budget): Promise<void> {
   await db.put('singletons', row);
 }
 
-/* ── 同步套用（P2P 與檔案匯入共用的**唯一**合併落盤路徑） ── */
+/* ── 同步落盤（決策層在 sync/applyCore.ts；這裡只負責寫） ── */
 
-type StoreName = 'records' | 'categories' | 'rules' | 'singletons';
+export type StoreName = 'records' | 'categories' | 'rules' | 'singletons';
 
 /**
- * 對單一 store 套用一批對端資料：core mergeAll 裁決 → 只落盤被採納的列。
- * records 額外過 reconcileInvoiceDuplicates（兩機各掃同一張發票的收斂；
- * 不做的話 by-invoice unique index 會在落盤時把整場同步炸掉）。
- * 「被採納」以參考不等判定：mergeAll 的 next 只在 take-incoming 時換物件。
+ * 批次落盤被採納的列（單一交易；失敗=整批 abort 並 throw——呼叫端走 apply-failed
+ * 路徑，不存 checkpoint，下次同步重送）。records 的 changed 列已由 reconcile
+ * 保證「墓碑無 invoice、活號碼唯一」，unique index 不會撞。
+ * Map 迭代序使既存 id（含剝號墓碑）先於新附加的 incoming 列 put=先釋放索引再寫入。
  */
-export async function applyIncoming<T extends Syncable>(
-  store: StoreName,
-  local: ReadonlyMap<string, T>,
-  incoming: readonly T[],
-): Promise<{ readonly next: ReadonlyMap<string, T>; readonly summary: MergeSummary; readonly deduped: number }> {
-  const merged = mergeAll(local, incoming);
-  let next = merged.next;
-  let deduped = 0;
-  if (store === 'records') {
-    // 泛型 T 在 records 分支實際上就是 ExpenseRecord；TS 看不穿執行期分派，過 unknown 橋接
-    const r = reconcileInvoiceDuplicates(next as unknown as ReadonlyMap<string, ExpenseRecord>);
-    next = r.next as unknown as ReadonlyMap<string, T>;
-    deduped = r.deduped;
-  }
-  const changed: T[] = [];
-  for (const [id, row] of next) if (local.get(id) !== row) changed.push(row);
-  if (changed.length > 0) {
-    const db = await getDb();
-    const tx = db.transaction(store, 'readwrite');
-    for (const r of changed) void tx.store.put(r as never);
-    await tx.done;
-  }
-  return { next, summary: merged.summary, deduped };
+export async function persistRows<T extends Syncable>(store: StoreName, rows: readonly T[]): Promise<void> {
+  if (rows.length === 0) return;
+  const db = await getDb();
+  const tx = db.transaction(store, 'readwrite');
+  for (const r of rows) void tx.store.put(r as never);
+  await tx.done;
 }
 
 /* ── 同步對象（peers）——本機限定 meta ── */
@@ -129,5 +109,21 @@ export async function savePeer(peer: PeerInfo): Promise<readonly PeerInfo[]> {
   const list = Array.isArray(raw) ? (raw as PeerInfo[]) : [];
   const next = [...list.filter((p) => p.peerDeviceId !== peer.peerDeviceId), peer];
   await db.put('meta', next, 'peers');
+  return next;
+}
+
+/**
+ * checkpoint 回撥（審查修正 #3/#18）：合入「updatedAt 早於既存水位」的列時，
+ * 若不回撥，這些列（第三來源：舊備份匯入、三裝置轉手）永遠不會轉送給其他 peer。
+ * 降到嚴格小於 minTaken：去掉字尾一字元的真前綴在字典序必然較小。
+ */
+export async function lowerPeerCheckpoints(minTaken: string): Promise<readonly PeerInfo[]> {
+  if (minTaken === '') return loadPeers();
+  const db = await getDb();
+  const raw = await db.get('meta', 'peers');
+  const list = Array.isArray(raw) ? (raw as PeerInfo[]) : [];
+  const lowered = minTaken.slice(0, -1);
+  const next = list.map((p) => (p.lastSyncedAt >= minTaken ? { ...p, lastSyncedAt: lowered } : p));
+  if (next.some((p, i) => p !== list[i])) await db.put('meta', next, 'peers');
   return next;
 }
