@@ -43,23 +43,34 @@ export async function closeDbForTests(): Promise<void> {
   }
 }
 
+/**
+ * schema 升級。**匯出是為了讓 test/db.test.ts 能拿這支真的函式驗護欄**——
+ * 測試自己抄一份升級邏輯的話，驗到的就不是實際跑的那份。
+ */
+export function upgradeZbDb(db: IDBPDatabase<ZbDB>, oldVersion: number): void {
+  // v1→v2 是**一次性**的清空重來（使用者決策：paidBy 從 A/B 槽位改 person uuid，
+  // 當時正式資料尚未開始記、不做遷移）。
+  //
+  // 條件必須綁死 `=== 1`：原本寫的是 `> 0`，那等於「任何一次 DB_VERSION 升級都先把
+  // 帳本刪光」——正式資料已經存在，那是一把上了膛的槍，且刪除不可逆。
+  if (oldVersion === 1) {
+    for (const name of [...db.objectStoreNames]) db.deleteObjectStore(name);
+  }
+  // 逐一保護：升級可能從任何舊版本進來（剛清空的、或未來只加一個 store 的版本），
+  // 已存在就跳過＝這支函式對任何 oldVersion 都可重入。
+  if (!db.objectStoreNames.contains('records')) {
+    const records = db.createObjectStore('records', { keyPath: 'id' });
+    records.createIndex('by-date', 'date');
+    records.createIndex('by-invoice', 'invoice.number', { unique: true });
+  }
+  if (!db.objectStoreNames.contains('categories')) db.createObjectStore('categories', { keyPath: 'id' });
+  if (!db.objectStoreNames.contains('rules')) db.createObjectStore('rules', { keyPath: 'id' });
+  if (!db.objectStoreNames.contains('persons')) db.createObjectStore('persons', { keyPath: 'id' });
+  if (!db.objectStoreNames.contains('singletons')) db.createObjectStore('singletons', { keyPath: 'id' });
+  if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta');
+}
+
 export function getDb(): Promise<IDBPDatabase<ZbDB>> {
-  dbPromise ??= openDB<ZbDB>(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
-      // v1→v2 是**清空重來**（使用者決策：paidBy 從 A/B 槽位改 person uuid，
-      // 正式資料尚未開始記、不做遷移）：舊 stores 全刪重建，peers/checkpoint 一併歸零。
-      if (oldVersion > 0) {
-        for (const name of [...db.objectStoreNames]) db.deleteObjectStore(name);
-      }
-      const records = db.createObjectStore('records', { keyPath: 'id' });
-      records.createIndex('by-date', 'date');
-      records.createIndex('by-invoice', 'invoice.number', { unique: true });
-      db.createObjectStore('categories', { keyPath: 'id' });
-      db.createObjectStore('rules', { keyPath: 'id' });
-      db.createObjectStore('persons', { keyPath: 'id' });
-      db.createObjectStore('singletons', { keyPath: 'id' });
-      db.createObjectStore('meta');
-    },
-  });
+  dbPromise ??= openDB<ZbDB>(DB_NAME, DB_VERSION, { upgrade: upgradeZbDb });
   return dbPromise;
 }

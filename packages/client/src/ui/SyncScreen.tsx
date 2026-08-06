@@ -2,7 +2,7 @@
  * 同步頁：面對面同步（主持=QR+房間碼 / 加入=輸碼）與檔案備份兩張紙卡，
  * 加 peers 清單（上次同步老化指標）。摘要卡是合併結果唯一外顯。
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import { QrCode } from './QrCode';
 import { SYNC } from '../strings/ui';
@@ -50,10 +50,21 @@ export function SyncScreen() {
   const cancelSync = useAppStore((s) => s.cancelSync);
   const exportLedger = useAppStore((s) => s.exportLedger);
   const importLedger = useAppStore((s) => s.importLedger);
+  const hydrated = useAppStore((s) => s.hydrated);
+  const pendingJoin = useAppStore((s) => s.pendingJoin);
+  const clearPendingJoin = useAppStore((s) => s.clearPendingJoin);
 
   const [joinMode, setJoinMode] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // deep link／掃碼帶進來的房間碼在這裡才真正入房：一定要等 hydrated——
+  // 帳本還沒載完就握手會把增量水位推到頂，這台的帳從此不再傳給對方（見 syncSlice.begin）
+  useEffect(() => {
+    if (!hydrated || !pendingJoin) return;
+    clearPendingJoin();
+    joinSync(pendingJoin);
+  }, [hydrated, pendingJoin, clearPendingJoin, joinSync]);
 
   const active = session !== null && (session.phase === 'waiting' || session.phase === 'exchanging');
   const errText =
