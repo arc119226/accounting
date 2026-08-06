@@ -30,6 +30,7 @@ const AFTER: readonly (readonly [string, string, string])[] = [
   ['stats.css', 'ledger.css', '.picked-list 內 .entry-row 沿用 ledger 定義再補邊界'],
   ['scan.css', 'entry.css', '.scan-preview 沿用 .sheet-title/.cat-scroller/.text-input 再補尺寸'],
   ['sync.css', 'components.css', '.room-code-input 覆蓋 .text-input、摘要卡沿用 .scroll-banner'],
+  ['sync.css', 'scan.css', '.join-viewport 沿用 .scan-viewport/.scan-hint 的取景器樣式再補尺寸'],
   ['dialogs.css', 'components.css', 'modal 內按鈕間距/覆蓋晚於元件定義'],
   ['toast.css', 'components.css', 'toast 內按鈕樣式晚於元件定義'],
   ['nav.css', 'components.css', 'nav 的 .screen 版面補充晚於元件定義'],

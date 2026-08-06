@@ -136,6 +136,17 @@ export const SYNC = {
   joinBtn: '加入同步室',
   codeLabel: '房間碼',
   codePlaceholder: '輸入 6 位房間碼',
+  scanJoinBtn: '掃對方的碼',
+  scanHint: '對準對方畫面上的方塊碼',
+  scanStarting: '喚起鏡頭…',
+  scanDenied: '鏡頭無法開啟——改用下面的房間碼',
+  hostQrHint: '請對方在柴米帳裡按「加入同步室 › 掃對方的碼」，或直接念這六碼。',
+  emptyGateTitle: '這個瀏覽器沒有帳本',
+  emptyGateBody:
+    '你可能是用系統相機掃了配對碼，於是 Safari 另開了一個空白的柴米帳。'
+    + '在這裡同步只會把帳複製到這個用完就丟的分頁——請回主畫面開柴米帳，'
+    + '再用 App 內的「掃對方的碼」。若你是在新手機上要還原備份，才選下面那個。',
+  emptyGateForce: '我確定要在這裡同步',
   waiting: '等待另一半的手機加入…',
   exchanging: '同步中…',
   doneTitle: '合併完成',
