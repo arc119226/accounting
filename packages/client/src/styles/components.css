@@ -58,11 +58,12 @@
 
 button:disabled { opacity: 0.35; cursor: not-allowed; }
 
-/* 角落圖示鈕（44×44 觸控下限） */
+/* 角落圖示鈕。44px 是**下限**不是尺寸——大字級使用者通常也需要更大的命中區，
+   而寫死 44 會讓放大的印章字畫到鈕外面。100% 時 2.75em = 44px，完全不改變現況。 */
 .corner-btn {
   position: relative;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: max(44px, 2.75em);
+  min-height: max(44px, 2.75em);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -77,7 +78,8 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 }
 .corner-btn:hover { border-color: var(--gold); filter: brightness(1.06); }
 .corner-btn:active { transform: translateY(1px); }
-.corner-seal { font-family: var(--font-brush), serif; font-size: 23px; color: var(--text); }
+/* line-height 1.2 而非預設的 1：毛筆字的墨跡高於等高行盒，字級一放大就畫到鈕外面 */
+.corner-seal { font-family: var(--font-brush), serif; font-size: 23px; line-height: 1.2; color: var(--text); }
 
 /* ── 印章：紅框單字（分類 glyph / 標題起首字） ── */
 .seal-char {
@@ -155,7 +157,9 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 /* ── 直書籤條（分類選擇器；sr2 wm-label 血統） ── */
 .paper-label {
   position: relative;
-  padding: 7px 5px 8px;
+  /* 內距用 em：直書籤條的**寬度**＝字寬＋左右內距，寫死 px 的話字級一放大字就畫到紙外。
+     100% 時 0.47em/0.33em/0.53em ≈ 原本的 7px/5px/8px。 */
+  padding: 0.47em 0.33em 0.53em;
   border: 1px solid #00000026;
   border-radius: 3px;
   background: linear-gradient(180deg, var(--scroll-paper1), var(--scroll-paper2));
@@ -196,6 +200,10 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* 觸控裝置：互動元件一律 44px 下限（sr2 慣例，media coarse 強制）。
    .text-input（原 37px）與 .app-toast-btn（原 26px）本來漏在清單外。 */
+/* 44px 是**下限**不是尺寸：寫成 max(44px, 2.75em) 讓它在大字級下跟著長
+   （大字級使用者通常也需要更大的命中區）。100% 時位元相同，不改變現況。
+   .key-btn 一併收進來：它今天靠 52px 巧合過關，而橫放組的 40px 直接違規。 */
 @media (pointer: coarse) {
-  .primary-btn, .ghost-btn, .seg-btn, .danger-btn, .text-input, .app-toast-btn { min-height: 44px; }
+  .primary-btn, .ghost-btn, .seg-btn, .danger-btn,
+  .text-input, .app-toast-btn, .key-btn, .note-chip { min-height: max(44px, 2.75em); }
 }

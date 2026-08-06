@@ -23,7 +23,7 @@ function RulesCard() {
         <p className="dim-text">{RULES.empty}</p>
       ) : (
         alive.map((r) => (
-          <div key={r.id} className="cat-row">
+          <div key={r.id} className="cat-row stacked">
             <span className="cat-name">
               {r.displayName || <span className="tnum">統編 {r.id}</span>}
             </span>
@@ -66,7 +66,7 @@ export function CategoriesScreen() {
     <div className="screen-body">
       <div className="paper-card">
         {cats.map((c, i) => (
-          <div key={c.id} className="cat-row">
+          <div key={c.id} className="cat-row stacked">
             <CategorySeal glyph={c.glyph} color={c.color} />
             <span className="cat-name">{c.name}</span>
             {c.builtin && <span className="cat-lock">{CATEGORIES.builtinLock}</span>}
@@ -121,7 +121,7 @@ export function CategoriesScreen() {
             className="text-input"
             value={name}
             placeholder={CATEGORIES.namePlaceholder}
-            maxLength={8}
+            maxLength={4}
             onChange={(e) => setName(e.target.value)}
           />
           <input

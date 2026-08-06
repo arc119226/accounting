@@ -1,5 +1,8 @@
 /* 統計頁：圖表文字、動畫、圖例、預算墨刷、自訂區間 */
-.chart-svg { width: 100%; height: auto; display: block; }
+/* overflow:visible——SVG root 預設是 hidden：任何超出 viewBox 的文字會被**無聲切掉**。
+   改 visible 之後最壞情況是「稍微超出卡片」而不是「看不到」，而 .paper-card 左右各有
+   20px 內距接得住。把靜默資料遺失換成輕微不整齊。 */
+.chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
 .chart-title {
   font-family: var(--font-display);
   font-size: 15px;
@@ -12,10 +15,12 @@
 }
 .chart-hint { font-size: 11px; font-weight: 400; letter-spacing: 0; }
 
-/* SVG 內文字：CSS 統一（屬性寫死會逃過主題） */
-.chart-tick { font-size: 10px; fill: var(--dim); font-family: var(--font-body); }
+/* SVG 內文字：CSS 統一（屬性寫死會逃過主題）。
+   13 不是 10：.chart-svg 的 width:100% 把 360 單位的 viewBox 壓進約 286px（0.79 倍），
+   10px 的刻度實際只有 7.9 CSS px——而它可能是全 app 唯一不隨系統字級長大的文字，
+   對眼睛不好的人，「太小」比「重疊」更嚴重。帶數字的 <text> 已全部搬進卡片標題列。 */
+.chart-tick { font-size: 13px; fill: var(--dim); font-family: var(--font-body); }
 .chart-tick.focus { fill: var(--gold); font-weight: 700; }
-.chart-value { font-size: 11px; fill: var(--scroll-ink); font-weight: 600; }
 
 /* 長條：由底長出、逐條 stagger */
 .bar-anim {
@@ -43,9 +48,8 @@
   to { stroke-dashoffset: 0; }
 }
 
-.donut-svg { max-width: 230px; margin: 0 auto; }
-.donut-total-label { font-size: 12px; fill: var(--dim); letter-spacing: 0.3em; }
-.donut-total { font-size: 21px; fill: var(--scroll-ink); font-weight: 700; font-family: var(--font-display); }
+/* 圖是給**人眼**看的，該隨字級長大（與 .qr-box、.scan-target 相反——那兩個的讀者是相機） */
+.donut-svg { max-width: min(100%, max(230px, 14em)); margin: 0 auto; }
 
 .donut-legend { display: flex; flex-direction: column; }
 .legend-row {
@@ -59,7 +63,7 @@
   font: inherit;
   color: inherit;
   cursor: pointer;
-  min-height: 44px;
+  min-height: max(44px, 2.75em);
 }
 .legend-row:last-child { border-bottom: none; }
 .legend-row.active { background: var(--seg-active-bg); border-radius: 8px; }
@@ -105,13 +109,23 @@
   flex-wrap: wrap;
 }
 .month-stepper { display: inline-flex; align-items: center; gap: 4px; }
-.stepper-btn { min-width: 44px; padding: 4px 8px; }
+.stepper-btn { min-width: max(44px, 2.75em); padding: 4px 8px; }
 
-/* 預算設定（設定頁） */
+/* 預算設定（設定頁）。標籤與輸入框放不下就上下兩行：
+   右對齊的數字框一旦裝不下，溢出方向是**左**，而 LTR 的可捲動溢出區不含左側
+   ⇒ 高位數字看不到（120px 的框在大字級下就開始吃位數）。把整列寬度讓給輸入框。 */
 .budget-input-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
-.budget-input-row .cat-name { flex: 1; }
-.budget-input-row .text-input { max-width: 120px; text-align: right; }
+.budget-input-row .cat-name { flex: 1 1 8em; white-space: normal; overflow: visible; }
+.budget-input-row .text-input { flex: 1 1 auto; max-width: none; text-align: right; }
+
+/* space-between 的列在大字級下要能換行，且換行後仍左右對位 */
+.chart-title, .budget-head, .legend-row { flex-wrap: wrap; }
+.chart-hint, .legend-amount { margin-left: auto; }
+.legend-name { flex: 1 1 6em; }
+.split-ends { gap: 12px; }
+.split-ends > :last-child { text-align: right; }

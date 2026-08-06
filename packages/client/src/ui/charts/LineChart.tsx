@@ -2,7 +2,7 @@
  * 累積趨勢線：本月累積實線（描筆動畫）+ 上月同期虛線參考（超速訊號）。
  * 兩線共用同一 y 比例（比較才有意義）。
  */
-import { formatAmount, type DayPoint } from '@zhangben/core';
+import { type DayPoint } from '@zhangben/core';
 
 const W = 360;
 const H = 150;
@@ -33,7 +33,6 @@ export function LineChart({
     previous.at(-1)?.cumulative ?? 0,
   );
   const days = Math.max(current.length, previous.length);
-  const endTotal = current.at(-1)?.cumulative ?? 0;
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="chart-svg" role="img" aria-label="本月累積趨勢線">
       <line x1={PAD.l} y1={H - PAD.b} x2={W - PAD.r} y2={H - PAD.b} stroke="var(--line-gold)" strokeWidth="1" />
@@ -62,9 +61,6 @@ export function LineChart({
           filter="url(#ink-bleed)"
         />
       )}
-      <text x={W - PAD.r} y={PAD.t} textAnchor="end" className="chart-value tnum">
-        {formatAmount(endTotal)}
-      </text>
       <text x={PAD.l} y={H - 6} className="chart-tick">1日</text>
       <text x={W - PAD.r} y={H - 6} textAnchor="end" className="chart-tick">{days}日</text>
     </svg>

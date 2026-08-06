@@ -22,6 +22,7 @@ const imported = barrelLines
   .map((l) => /^@import '\.\/styles\/([^']+)';$/.exec(l.trim())?.[1])
   .filter((n): n is string => !!n);
 const onDisk = fs.readdirSync(LEAF_DIR).filter((f) => f.endsWith('.css'));
+const leaf = (name: string): string => fs.readFileSync(path.join(LEAF_DIR, name), 'utf8');
 /** 後者在 import 順序中必須晚於前者（同特異性時 source order 決勝） */
 const AFTER: readonly (readonly [string, string, string])[] = [
   ['components.css', 'base.css', '元件依賴 base 的 tokens/@font-face 宣告'],
@@ -106,6 +107,92 @@ describe('styles barrel（順序即契約）', () => {
     // .spinner 刻意保留動畫——被加進**選擇器**就是有人沒讀那段註解（註解本身有提到它，先去掉）
     const rules = body.replace(/\/\*[\s\S]*?\*\//g, '');
     expect(rules).not.toMatch(/\.spinner/);
+  });
+
+  /**
+   * 已定高度的 column flex 容器，其直接子項一律不可收縮。
+   * 這是本專案踩過**兩次**的坑：元素只要自身 overflow 不是 visible/clip，min-height:auto
+   * 就解析為 0，於是它獨自吸收全部溢出量——而且吸完剛好不再溢出＝連捲軸都沒有。
+   * `.day-group`（overflow:hidden 求圓角）把整份帳本壓成一排日期標題、
+   * `.cat-scroller`（overflow-x:auto）把記帳抽屜的分類列壓成一條縫，都是它。
+   */
+  it('捲動容器的直接子項一律 flex 不可收縮（否則溢出會變成靜默刪內容）', () => {
+    expect(leaf('nav.css'), '.screen-body > * 缺收縮通則').toMatch(
+      /\.screen-body\s*>\s*\*\s*\{[^}]*flex:\s*0\s+0\s+auto/,
+    );
+    expect(leaf('entry.css'), '.sheet-scroll > * 缺收縮通則').toMatch(
+      /\.sheet-scroll\s*>\s*\*\s*\{[^}]*flex-shrink:\s*0/,
+    );
+  });
+
+  /**
+   * overflow:hidden 會讓元素變成捲動容器（min-height:auto → 0）；純粹想裁圓角的一律用 clip。
+   * 允許清單只收「本來就該是捲動/裁切容器」的那幾個。
+   */
+  it('overflow: hidden 要在允許清單內（想裁圓角請用 clip）', () => {
+    const ALLOW = new Set(['.scan-viewport', '.note-chip', '.cat-name', '.legend-name', '.entry-title', '.entry-sub']);
+    const bad: string[] = [];
+    for (const name of onDisk) {
+      const body = fs.readFileSync(path.join(LEAF_DIR, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      for (const m of body.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+        if (!/overflow(-[xy])?:\s*hidden/.test(m[2]!)) continue;
+        const sels = m[1]!.split(',').map((x) => x.trim().split(/\s+/).pop() ?? '');
+        if (!sels.some((sel) => ALLOW.has(sel))) bad.push(`${name}: ${m[1]!.trim()}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  /** text-size-adjust 會關掉 Android 使用者的系統字級縮放——一行就能廢掉他的協助工具設定 */
+  it('禁止 text-size-adjust', () => {
+    for (const name of onDisk) {
+      expect(fs.readFileSync(path.join(LEAF_DIR, name), 'utf8'), `${name} 出現 text-size-adjust`)
+        .not.toMatch(/text-size-adjust/);
+    }
+  });
+
+  /** 觸控下限是**下限**不是尺寸：寫死 44px 在大字級下會讓放大的字畫到鈕外面 */
+  it('觸控下限一律寫成 max(44px, …) 而非裸 44px', () => {
+    const bad: string[] = [];
+    for (const name of onDisk) {
+      const body = fs.readFileSync(path.join(LEAF_DIR, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      for (const line of body.split('\n')) {
+        if (/min-(width|height):\s*44px/.test(line)) bad.push(`${name}: ${line.trim()}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  /**
+   * TSX 用到的 class 必須真的有人定義。
+   * 這條會抓到 PersonSplit 那組 .split-row/.split-name/.split-amount——它們在任何葉檔都不存在，
+   * 於是 svg 的 display:block 把「姓名｜長條｜金額」拆成三行堆疊，而且沒人發現過。
+   */
+  it('TSX 的 className 字面量都要在某支葉檔裡定義得到', () => {
+    const SRC = path.join(DIR, '../src');
+    const defined = new Set<string>();
+    for (const name of onDisk) {
+      const body = fs.readFileSync(path.join(LEAF_DIR, name), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      for (const m of body.matchAll(/\.([a-z][\w-]*)/g)) defined.add(m[1]!);
+    }
+    /** 刻意無樣式的語意 class（給測試/查詢用），或由 JS 動態組出來的 */
+    const ALLOW = new Set(['tnum']);
+    const walk = (dir: string): string[] =>
+      fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory() ? walk(path.join(dir, e.name)) : e.name.endsWith('.tsx') ? [path.join(dir, e.name)] : [],
+      );
+    const bad: string[] = [];
+    for (const file of walk(SRC)) {
+      const body = fs.readFileSync(file, 'utf8');
+      // 只看純字面量的 className（含樣板字串裡的靜態片段），${} 的動態部分略過
+      for (const m of body.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\})/g)) {
+        const raw = (m[1] ?? m[2] ?? '').replace(/\$\{[^}]*\}/g, ' ');
+        for (const cls of raw.split(/\s+/).filter(Boolean)) {
+          if (!defined.has(cls) && !ALLOW.has(cls)) bad.push(`${path.basename(file)}: .${cls}`);
+        }
+      }
+    }
+    expect([...new Set(bad)]).toEqual([]);
   });
 
   it('CSS 引用的站內資產必須存在於 public/（改副檔名或搬檔漏改一處=靜默退回，不會報錯）', () => {

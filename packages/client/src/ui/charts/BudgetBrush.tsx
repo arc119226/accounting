@@ -11,7 +11,7 @@ function BrushBar({ spent, limit }: { spent: number; limit: number }) {
   const wSpent = Math.min(1, spent / base);
   const wLimit = Math.min(1, limit / base);
   return (
-    <svg viewBox="0 0 360 18" className="chart-svg brush-bar" role="img" aria-label="預算進度">
+    <svg viewBox="0 0 360 18" className="chart-svg" role="img" aria-label="預算進度">
       <rect x="1" y="3" width="358" height="12" rx="3" fill="var(--card-elev)" />
       <g filter="url(#ink-bleed-heavy)">
         {/* 額度內：濃墨 */}

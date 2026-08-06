@@ -36,6 +36,26 @@
   padding: 6px max(16px, env(safe-area-inset-right)) 16px max(16px, env(safe-area-inset-left));
 }
 
+/* ★ 版面通則：.screen-body 是**捲動容器**，內容超過就捲，永不壓扁子項。
+   為什麼需要這條——CSS 規範下，元素只要自身 computed overflow 不是 visible/clip，
+   它的 min-height:auto 就解析為 0；在「已定高度 + column flex」的容器裡，這種子項會
+   **獨自吸收全部溢出量**，而且吸收完剛好不再溢出 ⇒ 連捲軸都不會出現。
+   資料不是被藏在捲軸下面，是**被刪掉了**。.day-group（為了圓角而 overflow:hidden）
+   就是這樣把整份日分組清單壓成一排日期標題：實測 27 筆記錄一筆都看不見、也捲不到。
+
+   用 flex 簡寫而不只寫 flex-shrink：
+   - shrink:0 治「被壓扁」
+   - grow:0   治「被撐胖」（.seg 的 flex:1 是為橫向父寫的，當 .screen-body 直接子項時
+     會在直向長大——統計頁空區間時那排區間鈕就是這樣脹成一片）
+   - basis:auto 讓尺寸一律由內容決定＝系統字級放大時盒子自動跟著長
+   逐項補 min-height 是白名單制，漏一個的症狀就是靜默刪內容——那正是這個 bug 的成因，
+   所以改成黑名單：預設不可伸縮，要伸縮的人自己掛 .grow。
+   用 `>` 直接子選擇器（不是後代）是刻意的：.scan-viewport / .scan-result 的 flex:1
+   掛在 .scan-body 底下，不受這條影響。 */
+.screen-body > * { flex: 0 0 auto; }
+/* 逃生口。特異性 (0,2,0) ⇒ 不受 barrel 順序影響，放哪一支葉檔都壓得過上面那條 */
+.screen-body > .grow { flex: 1 1 auto; min-height: 0; }
+
 /* 底部導覽：紙面沉底 + 墨字；active 玉青 */
 .bottom-nav {
   display: flex;
@@ -45,7 +65,9 @@
 }
 .nav-btn {
   flex: 1;
-  min-height: 56px;
+  /* 下限而非尺寸：字級放大時導覽列要跟著長高，否則圖示與標籤畫到列外。
+     toast 的 bottom 公式（toast.css）與這個值是一組的。 */
+  min-height: max(56px, 3.5em);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -62,7 +84,8 @@
 .nav-glyph {
   font-family: var(--font-brush);
   font-size: 22px;
-  line-height: 1;
+  /* 1 太緊：毛筆字的墨跡高於行盒，字級一放大就畫到行盒外（在有裁切的祖先下會被切頭切腳） */
+  line-height: 1.2;
 }
 .nav-btn.active .nav-glyph { text-shadow: 0 0 10px var(--accent-glow); }
 .nav-label { font-size: 11px; letter-spacing: 0.1em; }

@@ -62,13 +62,18 @@ function JoinScanner({ onCode, onCancel }: { onCode: (code: string) => void; onC
   );
   useQrScan({ enabled: true, videoRef, onCodes, onPhase: setPhase });
 
+  // 提示條與取消鈕都在取景器**外面**、走正常流（沿用既有的 .sync-live：
+  // column flex + 置中 + gap）。原本兩者都是取景器內的絕對定位、都沒有 z-index，
+  // 而取消鈕在 DOM 中排後面 ⇒ 直接畫在提示上，denied 那句的「房間碼」剛好被蓋掉。
   return (
-    <div className="scan-viewport join-viewport">
-      <video ref={videoRef} className="scan-video" muted playsInline />
+    <div className="sync-live">
+      <div className="scan-viewport join-viewport">
+        <video ref={videoRef} className="scan-video" muted playsInline />
+      </div>
       <p className={`scan-hint${phase === 'denied' ? ' denied' : ''}`}>
         {phase === 'denied' ? SYNC.scanDenied : phase === 'camera' ? SYNC.scanHint : SYNC.scanStarting}
       </p>
-      <button className="ghost-btn join-cancel" onClick={onCancel}>
+      <button className="ghost-btn" onClick={onCancel}>
         {SYNC.cancel}
       </button>
     </div>
@@ -198,7 +203,7 @@ export function SyncScreen() {
                     灌進用完即丟的殼。非網址就沒有那顆按鈕——請對方用 App 內的掃碼加入。
                     六碼照樣印在下面，混版本期間永遠有手打這條路。 */}
                 <QrCode text={buildSyncLink(roomCode)} />
-                <div className="room-code brush-text">{roomCode}</div>
+                <div className="room-code">{roomCode}</div>
                 <p className="dim-text sync-status">{SYNC.hostQrHint}</p>
               </>
             )}

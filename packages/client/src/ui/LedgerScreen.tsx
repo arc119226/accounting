@@ -50,12 +50,11 @@ function DayGroup({ date, rows }: { date: string; rows: ExpenseRecord[] }) {
           >
             <CategorySeal glyph={cat?.glyph ?? '雜'} color={cat?.color ?? '#6e6046'} />
             <span className="entry-text">
-              <span className="entry-title">
-                {r.merchant?.name || r.note || cat?.name || ''}
-                {r.source === 'einvoice' && <span className="einv-chip">{LEDGER.einvoiceChip}</span>}
-              </span>
+              <span className="entry-title">{r.merchant?.name || r.note || cat?.name || ''}</span>
               {r.merchant?.name && r.note && <span className="entry-sub">{r.note}</span>}
             </span>
+            {/* chip 是 .entry-row 的獨立欄，不放進 .entry-title——那裡有 ellipsis 會把它一起吃掉 */}
+            {r.source === 'einvoice' && <span className="einv-chip">{LEDGER.einvoiceChip}</span>}
             <span className="entry-amount tnum">{formatNTD(r.amount)}</span>
           </button>
         );

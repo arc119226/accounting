@@ -10,20 +10,69 @@
   z-index: 80;
   animation: fadein 0.15s ease;
 }
+/* 三段式：.sheet-head（標題＋金額）／.sheet-scroll（唯一捲動區）／.sheet-foot（入帳鈕）。
+   頭尾移出捲動區＝「金額」與「入帳」在任何字級與視窗高都不會被推出視野。 */
 .entry-sheet {
   width: 100%;
   /* 100% = 已扣掉鍵盤的 overlay 高；鍵盤開著時抽屜自己變矮並內捲，不被蓋住 */
   max-height: min(88dvh, 100%);
+  /* 保險絲：正常情形由 .sheet-scroll 吸完溢出，只有「頭+尾自己就超過上限」
+     （200% 字級＋軟鍵盤＋320px 機）才會用到。用到時寧可整個抽屜捲，也不要按鈕被推出去。
+     刻意**不加** overflow:hidden——sheetUp 那 0.22s 內 transform 非 none，
+     會讓抽屜成為 fixed 子孫的包含塊並裁掉 ConfirmDialog。 */
   overflow-y: auto;
   background: var(--card);
   border-top: 1px solid var(--line-gold);
   border-radius: 18px 18px 0 0;
   box-shadow: inset 0 1px 0 #fff7e2aa, 0 -8px 30px rgba(0, 0, 0, 0.35);
-  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding: 0; /* 內距下放到三段各自身上：頭尾要自己畫滿整幅，捲動區要能捲到邊 */
+  display: flex;
+  flex-direction: column;
+  animation: sheetUp 0.22s ease both;
+}
+
+/* 頭尾一律不可壓縮：被壓掉的會是「金額」與「入帳」，正是使用者說不能不見的兩樣 */
+.sheet-head,
+.sheet-foot { flex: 0 0 auto; }
+
+.sheet-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 16px 0;
+}
+.sheet-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: max(44px, 2.75em); /* 沒有刪除鈕時也維持同高，新增/編輯兩模式不跳版 */
+}
+/* 刪除走硃砂印章語彙而非灰框：抽屜裡唯一不可逆的操作要看得出來 */
+.sheet-head-row .corner-btn { border-color: var(--red); }
+.sheet-head-row .corner-seal { color: var(--red); }
+
+/* 全抽屜唯一的捲動區。min-height:0 是必要條件——flex item 的 min-height:auto 會擋住收縮，
+   少了它就變成整個抽屜溢出、頭尾一起被推出去。 */
+.sheet-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* 捲到底不要把手勢傳給底下的帳本 */
   display: flex;
   flex-direction: column;
   gap: 10px;
-  animation: sheetUp 0.22s ease both;
+  padding: 10px 16px;
+}
+
+/* ★ 與 nav.css 的 .screen-body > * 同一條通則（理由見那裡）。
+   .cat-scroller 有 overflow-x:auto ⇒ min-height:auto 解析為 0 ⇒ 原本由它一個人
+   吸收整個抽屜的溢出量（88px→一條縫→0），而且吸完剛好不溢出＝連捲軸都沒有。 */
+.sheet-scroll > * { flex-shrink: 0; }
+
+.sheet-foot {
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--gold-hairline); /* 「上面還有內容」的暗示，沿用 scan.css 的用色 */
 }
 @keyframes sheetUp {
   from { transform: translateY(30%); opacity: 0.4; }
@@ -37,12 +86,20 @@
 }
 
 .amount-display {
-  font-size: 40px;
+  /* em 讓金額跟著系統字級長大（視力不好的人最需要看清的就是這一行）；
+     60px 天花板避免它自己把版面撐爆。100% 時 min(2.5em,60px) = 40px，與原本相同。 */
+  font-size: min(2.5em, 60px);
   font-weight: 700;
-  text-align: right;
   padding: 2px 10px 6px;
   border-bottom: 2px solid var(--line-gold);
   font-family: var(--font-display);
+  /* text-align:right 換成 safe flex-end：放得下靠右（設計原意不變）、放不下**自動退回靠左**
+     並可橫捲。原本的 text-align:right 一旦裝不下，溢出方向是**左**，而 LTR 的可捲動溢出區
+     不含左側 ⇒ $99,999,999 的高位數字永久看不到也捲不到（div 沒有 caret 可救）。 */
+  display: flex;
+  justify-content: safe flex-end;
+  overflow-x: auto;
+  scrollbar-width: none; /* 只有極長金額才會出現，捲軸會壓掉一行高 */
 }
 
 .entry-grid {
@@ -136,15 +193,23 @@
 .note-chip:hover { filter: brightness(1.06); }
 .note-chip.active { outline: 2px solid var(--scroll-zhu); outline-offset: 1px; }
 
-.sheet-actions { justify-content: space-between; }
-.save-btn { flex: 1; max-width: 260px; margin-left: auto; }
+/* 兩顆等寬分欄：任何字級下都只有**一條**對齊規則（grid 分欄），不再是 flex 換行後
+   第一行歸 justify-content、第二行歸 auto margin 的兩套。
+   （原本的 .save-btn { flex:1; max-width:260px; margin-left:auto } 連同 class 一起刪——
+   grid 讓那三行全部失效，留著只是孤兒選擇器。） */
+.sheet-actions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 10px;
+}
 
 /* 分類管理 */
 .cat-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: max(44px, 2.75em);
 }
 .cat-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cat-lock {
@@ -154,14 +219,31 @@
   border-radius: 4px;
   padding: 0 4px;
 }
+/* 名稱一行、控制項一行。▲▼✕ 各 44px（誤觸的代價是刪掉分類，這個下限不讓）＋ 44px 色票，
+   一列光工具就吃掉 188px，360px 機只剩 51px 給名稱——連三個字都放不下，320px 機更是
+   一個字都不剩；商家規則列同理，剩 86px 卻要放「統編 12345678」，而統編是辨識規則的唯一依據。
+   8em ＝「名稱至少要有這麼寬，否則就換行」：塞得下維持單行，塞不下才把工具移到第二列。
+   分類管理與預算設定都是一輩子進幾次的頁，換行划算。 */
+.cat-row.stacked { flex-wrap: wrap; row-gap: 6px; }
+.cat-row.stacked .cat-name {
+  flex: 1 1 8em;
+  /* 名稱換行比 ellipsis 誠實：眼睛不好的人看到「餐飲外…」讀不出是什麼 */
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+}
+.cat-row.stacked .cat-tools { margin-left: auto; }
+/* 下拉的 max-width:140px 在自訂長名稱下就已經在裁選項；換行之後由整列寬度決定，不需要魔術數字 */
+.cat-row.stacked .rule-select { flex: 1 1 auto; width: auto; min-width: 0; max-width: none; }
+
 .cat-tools { display: flex; gap: 4px; align-items: center; }
 /* ▲▼✕ 誤觸的代價是刪掉分類，寬度補到 44——代價是 .cat-name 從 89px 縮到 51px
    （約 3 字後 ellipsis，名稱本來就 maxLength=8），而分類管理一輩子只進幾次。 */
-.cat-tool { min-width: 44px; padding: 6px 4px; font-size: 12px; }
+.cat-tool { min-width: max(44px, 2.75em); padding: 6px 4px; font-size: 12px; }
 .cat-color-input {
   /* 視覺仍是 30px 的色塊（原生色票填滿 content box），靠內距把命中區撐到 44 */
-  width: 44px;
-  height: 44px;
+  width: max(44px, 2.75em);
+  height: max(44px, 2.75em);
   padding: 7px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -175,9 +257,13 @@
   flex-wrap: wrap;
 }
 .cat-add-row .text-input { flex: 1; min-width: 90px; width: auto; }
-.cat-glyph-input { max-width: 58px; text-align: center; flex: 0 0 auto; }
+/* 印章框只放 1–2 個字（maxLength=2）。原本的 max-width:58px + flex:0 0 auto **從未生效**——
+   .cat-add-row .text-input（特異性 0,2,0）的 min-width:90px 贏過它（0,1,0），實際渲染是 90px。
+   這裡用同特異性寫回真正的意圖，並用 em 讓它跟著字級長。 */
+.cat-glyph-input { text-align: center; }
+.cat-add-row .cat-glyph-input { flex: 0 0 auto; width: 5.5em; min-width: 0; max-width: none; }
 
-.rule-select { max-width: 140px; flex: 0 0 auto; }
+.rule-select { flex: 0 1 auto; min-width: 0; }
 
 /* 人物頁籤（帳本/統計共用）：seg 樣式沿用，只收窄與置中 */
 .person-tabs { flex: 0 0 auto; align-self: center; min-width: min(100%, 360px); }

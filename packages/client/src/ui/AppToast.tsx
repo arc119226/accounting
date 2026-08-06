@@ -4,6 +4,7 @@
  */
 import { useEffect, useSyncExternalStore } from 'react';
 import { dismiss, getNotice, subscribe, type NoticeKind } from '../notice';
+import { useAppStore } from '../store/appStore';
 import { NOTICE } from '../strings/ui';
 
 /** 自退時長；0=常駐（要使用者動作）。用 Record 而非索引簽章，noUncheckedIndexedAccess 不會咬。 */
@@ -17,6 +18,8 @@ const AUTO_DISMISS_MS: Readonly<Record<NoticeKind, number>> = {
 
 export function AppToast() {
   const notice = useSyncExternalStore(subscribe, getNotice);
+  const screen = useAppStore((s) => s.screen);
+  const sheetOpen = useAppStore((s) => s.entryDraft !== null);
 
   const ms = notice ? AUTO_DISMISS_MS[notice.kind] : 0;
   useEffect(() => {
@@ -31,8 +34,11 @@ export function AppToast() {
     : notice.kind === 'saveFailed' ? NOTICE.saveFailed
     : (notice.text ?? '');
   const action = notice.action;
+  // 位置三態：抽屜開著→貼頂；帳本頁（底部中軸線上有 FAB）→抬到 FAB 之上；其餘→原位。
+  // 改**位置**而不是改層級：updateReady 的「重新整理」與復原鈕都是必須按得到的。
+  const place = sheetOpen ? ' at-top' : screen === 'ledger' ? ' above-fab' : '';
   return (
-    <div className="app-toast" role="status">
+    <div className={`app-toast${place}`} role="status">
       <span>{text}</span>
       {notice.kind === 'updateReady' && (
         <button className="app-toast-btn" onClick={() => location.reload()}>

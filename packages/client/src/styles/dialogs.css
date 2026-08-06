@@ -11,7 +11,13 @@
   animation: fadein 0.15s ease;
   /* 高卡在小手機上可捲動；永不貼邊=留可點背景 */
   overflow-y: auto;
-  padding: 16px 12px;
+  /* NameGate 是首啟全屏卡，viewport-fit=cover 下沒有 env() 就會入侵瀏海與導覽列。
+     inset 已經讓開鍵盤，這裡讓開的是實體切口。 */
+  padding:
+    max(16px, env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
 }
 .modal-card {
   background: var(--card);
@@ -50,7 +56,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
 .crash-card { max-width: 420px; }
 .crash-digest {

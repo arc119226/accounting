@@ -23,6 +23,7 @@ import { useAppStore } from '../store/appStore';
 import { getPersonId } from '../ids';
 import { sortPersonsForTabs } from '../personView';
 import { draftFromRecord, todayISO } from '../store/ledgerSlice';
+import { catTagName } from '../catTag';
 import { getDetector } from '../scan/detector';
 import { acquireCamera } from '../scan/camera';
 import { show } from '../notice';
@@ -93,9 +94,15 @@ function PreviewCard({
       <label className="field-label">{ENTRY.categoryLabel}</label>
       <div className="cat-scroller">
         {cats.map((c) => (
-          <button key={c.id} className={`paper-label${categoryId === c.id ? ' active' : ''}`} onClick={() => setCategoryId(c.id)}>
+          <button
+            key={c.id}
+            className={`paper-label${categoryId === c.id ? ' active' : ''}`}
+            aria-label={`${c.glyph}${c.name}`}
+            title={c.name}
+            onClick={() => setCategoryId(c.id)}
+          >
             {c.glyph}
-            {c.name}
+            {catTagName(c.name)}
           </button>
         ))}
       </div>
@@ -151,12 +158,14 @@ function PreviewCard({
         </details>
       )}
 
-      <div className="modal-actions sheet-actions">
+      {/* 不掛 .modal-actions：barrel 順序讓 dialogs.css 晚於 entry.css，
+          同特異性下 .modal-actions 會蓋掉 .sheet-actions 的 display/justify-content */}
+      <div className="sheet-actions">
         <button className="ghost-btn" onClick={onRescan}>
           {SCAN.rescan}
         </button>
         <button
-          className="primary-btn save-btn"
+          className="primary-btn"
           disabled={!amount}
           onClick={() => {
             saveScanned({
@@ -352,8 +361,10 @@ export function ScanScreen() {
                 <div className="scan-target" />
               </div>
             )}
-            <p className={`scan-hint${phase === 'denied' ? ' denied' : ''}`}>{hint}</p>
           </div>
+          {/* 提示條在取景器**外面**：裡面是 overflow:hidden，字級一放大整句就被左右對稱切掉，
+              橫放時還會壓住兩個取景框的下緣 */}
+          <p className={`scan-hint${phase === 'denied' ? ' denied' : ''}`}>{hint}</p>
           <div className="scan-controls">
             <input
               ref={fileRef}
