@@ -30,7 +30,7 @@
 .danger-btn {
   padding: 12px 18px;
   background: var(--red);
-  color: #fff;
+  color: var(--on-danger);
   font-weight: 800;
   border: none;
   border-radius: 10px;
@@ -72,7 +72,7 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   background: color-mix(in srgb, var(--card) 78%, transparent);
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 2px 8px #00000030;
+  box-shadow: var(--shadow-btn);
   cursor: pointer;
   transition: border-color 0.15s, filter 0.15s;
 }
@@ -102,10 +102,10 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   font-weight: 700;
   color: var(--scroll-ink);
   background: linear-gradient(180deg, var(--scroll-paper1), var(--scroll-paper2));
-  border-top: 1px solid #c7ab6e;
-  border-bottom: 1px solid #8a6f3a;
+  border-top: 1px solid var(--scroll-edge-hi);
+  border-bottom: 1px solid var(--scroll-edge-lo);
   border-radius: 2px;
-  box-shadow: 0 3px 10px #00000066, inset 0 1px 0 #fff7e2cc;
+  box-shadow: var(--shadow-banner), var(--sheen-strong);
   letter-spacing: 0.1em;
   padding: 8px 26px;
   position: relative;
@@ -120,7 +120,7 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   width: 11px;
   border-radius: 4px;
   background: var(--scroll-rod);
-  box-shadow: 0 1px 5px #000000aa, inset 0 0 2px #ffe9b055;
+  box-shadow: var(--shadow-rod), var(--sheen-gold);
 }
 .scroll-banner::before { left: -5px; }
 .scroll-banner::after { right: -5px; }
@@ -131,7 +131,7 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 18px 20px;
-  box-shadow: inset 0 1px 0 #fff7e2aa;
+  box-shadow: var(--sheen);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -139,14 +139,14 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* 淺紙資訊卡（金額小計；sr2 lobby-card 血統），頂色條由 --card-accent 注入 */
 .money-card {
-  --card-accent: #b08a4f;
-  background: linear-gradient(168deg, #f5efdf, #ece2cb);
-  color: #2c2417;
-  border: 1px solid rgba(90, 70, 40, 0.45);
+  --card-accent: var(--money-accent);
+  background: var(--money-face);
+  color: var(--money-ink);
+  border: 1px solid var(--money-line);
   border-top: 3px solid var(--card-accent);
   border-radius: 10px;
   padding: 12px 14px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--shadow-card);
 }
 .money-card .money-name { font-size: 14px; letter-spacing: 0.12em; color: var(--dim); }
 .money-card .money-amount { font-size: 22px; font-weight: 700; }
@@ -160,10 +160,10 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   /* 內距用 em：直書籤條的**寬度**＝字寬＋左右內距，寫死 px 的話字級一放大字就畫到紙外。
      100% 時 0.47em/0.33em/0.53em ≈ 原本的 7px/5px/8px。 */
   padding: 0.47em 0.33em 0.53em;
-  border: 1px solid #00000026;
+  border: 1px solid var(--tag-line);
   border-radius: 3px;
   background: linear-gradient(180deg, var(--scroll-paper1), var(--scroll-paper2));
-  box-shadow: 0 2px 7px #0000004d;
+  box-shadow: var(--shadow-tag);
   color: var(--scroll-ink);
   font-family: var(--font-brush);
   font-size: 15px;
@@ -177,7 +177,7 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
   transition: box-shadow 0.15s ease, filter 0.15s ease;
 }
 .paper-label:hover,
-.paper-label:focus-visible { box-shadow: 0 3px 12px #00000066; filter: brightness(1.06); }
+.paper-label:focus-visible { box-shadow: var(--shadow-tag-hover); filter: brightness(1.06); }
 .paper-label.active { outline: 2px solid var(--scroll-zhu); outline-offset: 1px; }
 /* 籤條刻意窄（15px 直書字＋5px 內距＝27px 寬），但觸控面也只有 27px——記帳最常點的東西。
    透明 ::after 往左右各撐 5px（＝剛好鋪滿 .cat-scroller 的 gap，相鄰命中區恰好接壤不重疊），

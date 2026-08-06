@@ -54,7 +54,7 @@ export function DonutChart({
               className="donut-arc"
               d={arcPath(start, endClamped)}
               fill="none"
-              stroke={pressColor(colors.get(d.categoryId) ?? '#6e6046')}
+              stroke={pressColor(colors.get(d.categoryId) ?? 'var(--dim)')}
               strokeWidth={STROKE}
               pathLength={1}
               style={{ animationDelay: `${start * 500}ms` }}

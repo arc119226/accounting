@@ -24,7 +24,7 @@
   background: var(--card);
   border-top: 1px solid var(--line-gold);
   border-radius: 18px 18px 0 0;
-  box-shadow: inset 0 1px 0 #fff7e2aa, 0 -8px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--sheen), var(--shadow-sheet);
   padding: 0; /* 內距下放到三段各自身上：頭尾要自己畫滿整幅，捲動區要能捲到邊 */
   display: flex;
   flex-direction: column;
@@ -142,7 +142,7 @@
 .text-input {
   font: inherit;
   color: var(--text);
-  background: #fdf8ec;
+  background: var(--field-bg);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
@@ -179,10 +179,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 6px 10px;
-  border: 1px solid #00000026;
+  border: 1px solid var(--tag-line);
   border-radius: 3px;
   background: linear-gradient(180deg, var(--scroll-paper1), var(--scroll-paper2));
-  box-shadow: 0 2px 7px #0000004d;
+  box-shadow: var(--shadow-tag);
   color: var(--scroll-ink);
   font-family: var(--font-brush);
   font-size: 13px;

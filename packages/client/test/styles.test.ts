@@ -210,4 +210,112 @@ describe('styles barrel（順序即契約）', () => {
     expect(checked, 'CSS 裡一個站內 url() 都沒掃到 ⇒ 這條測試等於沒在測').toBeGreaterThan(0);
     expect(missing).toEqual([]);
   });
+
+  /* ─────────────── 顏色 token（夜墨主題 BACKLOG #10 的地基） ─────────────── */
+
+  /** 裸色值：#rgb / #rrggbb(aa) / rgb(a)() / hsl(a)()。transparent 與 currentColor 不算 */
+  const BARE_COLOR = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/;
+  const strip = (s: string): string => s.replace(/\/\*[\s\S]*?\*\//g, '');
+  /** :root 定義的 token（base.css 是唯一的定義點） */
+  const rootTokens = new Set(
+    [...strip(leaf('base.css')).matchAll(/^\s*(--[\w-]+)\s*:/gm)].map((m) => m[1]!),
+  );
+  /**
+   * 不在 base.css 定義、但確實有人餵值的 token：
+   * --kb 由 keyboard.ts 於執行期寫入；--card-accent 與 --cat-color 由元件內聯注入。
+   */
+  const RUNTIME_TOKENS = new Set(['--kb', '--card-accent', '--cat-color']);
+
+  it('葉檔不准出現裸色值——顏色一律住 base.css 的 :root', () => {
+    // 收編前這裡有 46 處（其中 17 處藏在 box-shadow 裡）。夜墨主題換的是 :root 那一份，
+    // 任何逃逸到葉檔的裸色都會在換主題時原地不動 ⇒ 那一塊區域直接瞎掉。
+    const bad: string[] = [];
+    for (const name of onDisk) {
+      if (name === 'base.css') continue;
+      strip(leaf(name))
+        .split('\n')
+        .forEach((line, i) => {
+          if (BARE_COLOR.test(line)) bad.push(`${name}:${i + 1}  ${line.trim()}`);
+        });
+    }
+    expect(bad).toEqual([]);
+    // 防真空：同一條正則套在 base.css 上必須大量命中，否則就是正則寫壞了而不是真的乾淨
+    const inBase = strip(leaf('base.css')).split('\n').filter((l) => BARE_COLOR.test(l)).length;
+    expect(inBase, '連 base.css 都掃不到裸色 ⇒ BARE_COLOR 正則壞了，上面那條等於沒在測').toBeGreaterThan(20);
+  });
+
+  it('每個 var(--x) 都要有定義（打錯字的 var 會靜靜地什麼都不畫）', () => {
+    const bad: string[] = [];
+    const check = (label: string, body: string): void => {
+      for (const m of body.matchAll(/var\(\s*(--[\w-]+)/g)) {
+        const t = m[1]!;
+        if (!rootTokens.has(t) && !RUNTIME_TOKENS.has(t)) bad.push(`${label}: ${t}`);
+      }
+    };
+    for (const name of onDisk) check(name, strip(leaf(name)));
+    const walkTs = (dir: string): string[] =>
+      fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? walkTs(path.join(dir, e.name))
+          : /\.tsx?$/.test(e.name) ? [path.join(dir, e.name)] : [],
+      );
+    for (const f of walkTs(path.join(DIR, '../src'))) check(path.basename(f), fs.readFileSync(f, 'utf8'));
+    expect([...new Set(bad)]).toEqual([]);
+  });
+
+  it('沒有死 token——定義了卻沒人用的顏色會在夜墨那輪誤導人', () => {
+    let all = '';
+    for (const name of onDisk) all += strip(leaf(name));
+    const walkTs = (dir: string): string[] =>
+      fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? walkTs(path.join(dir, e.name))
+          : /\.tsx?$/.test(e.name) ? [path.join(dir, e.name)] : [],
+      );
+    for (const f of walkTs(path.join(DIR, '../src'))) all += fs.readFileSync(f, 'utf8');
+    const used = new Set([...all.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]!));
+    const dead = [...rootTokens].filter((t) => !used.has(t) && !RUNTIME_TOKENS.has(t));
+    expect(dead).toEqual([]);
+  });
+
+  it('固定組 --fixed-* 不得被任何 [data-theme] 區塊覆寫（讀者是相機，不是人眼）', () => {
+    // QR 的 quiet zone 與取景器疊在實時影像上——它們變深就是「掃不到」與「瞄不準」，
+    // 是正確性不是品味。夜墨主題那輪加 :root[data-theme='ink'] 時，這條會擋住順手一起改。
+    const bad: string[] = [];
+    for (const name of onDisk) {
+      const body = strip(leaf(name));
+      for (const m of body.matchAll(/\[data-theme[^{]*\{([^}]*)\}/g)) {
+        for (const t of m[1]!.matchAll(/(--fixed-[\w-]+)\s*:/g)) bad.push(`${name}: ${t[1]}`);
+      }
+    }
+    expect(bad).toEqual([]);
+    // 同時確認固定組真的存在——沒有它就沒東西可守
+    expect([...rootTokens].filter((t) => t.startsWith('--fixed-')).length).toBeGreaterThan(0);
+  });
+
+  it('開機底色：index.html 與 manifest 必須等於 base.css 的 --bg / --text', () => {
+    // 這三處在 CSS 載入**之前**就要生效，天生用不了 var()。漏改一處的症狀是
+    // 「夜墨使用者開 app 先閃一下白紙」——上線後才看得到、而且只有第一秒。
+    const tokenVal = (name: string): string =>
+      new RegExp(`^\\s*${name}\\s*:\\s*([^;]+);`, 'm').exec(strip(leaf('base.css')))?.[1]?.trim() ?? '';
+    const bg = tokenVal('--bg');
+    const text = tokenVal('--text');
+    expect(bg, '--bg 沒讀到').toMatch(/^#[0-9a-f]{6}$/i);
+    expect(text, '--text 沒讀到').toMatch(/^#[0-9a-f]{6}$/i);
+
+    const html = fs.readFileSync(path.join(DIR, '../index.html'), 'utf8');
+    const themeColor = /<meta\s+name="theme-color"\s+content="([^"]+)"/.exec(html)?.[1];
+    expect(themeColor?.toLowerCase(), 'index.html 的 theme-color').toBe(bg.toLowerCase());
+    const boot = /body\s*\{[^}]*\}/.exec(html)?.[0] ?? '';
+    expect(boot, '首漆內聯樣式沒找到 body 規則').toContain('background');
+    expect(new RegExp(`background:\\s*${bg}\\b`, 'i').test(boot), `首漆 background 應為 ${bg}`).toBe(true);
+    expect(new RegExp(`color:\\s*${text}\\b`, 'i').test(boot), `首漆 color 應為 ${text}`).toBe(true);
+
+    const mani = JSON.parse(fs.readFileSync(path.join(DIR, '../public/manifest.webmanifest'), 'utf8')) as {
+      background_color?: string;
+      theme_color?: string;
+    };
+    expect(mani.background_color?.toLowerCase(), 'manifest background_color').toBe(bg.toLowerCase());
+    expect(mani.theme_color?.toLowerCase(), 'manifest theme_color').toBe(bg.toLowerCase());
+  });
 });

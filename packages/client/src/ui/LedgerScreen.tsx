@@ -48,7 +48,7 @@ function DayGroup({ date, rows }: { date: string; rows: ExpenseRecord[] }) {
               openEntry(draftFromRecord(r))
             }
           >
-            <CategorySeal glyph={cat?.glyph ?? '雜'} color={cat?.color ?? '#6e6046'} />
+            <CategorySeal glyph={cat?.glyph ?? '雜'} color={cat?.color ?? 'var(--dim)'} />
             <span className="entry-text">
               <span className="entry-title">{r.merchant?.name || r.note || cat?.name || ''}</span>
               {r.merchant?.name && r.note && <span className="entry-sub">{r.note}</span>}
@@ -160,7 +160,8 @@ export function LedgerScreen() {
             <div
               key={p.id}
               className="money-card person-card"
-              style={{ ['--card-accent' as string]: i === 0 ? '#8a6a2f' : '#3d6b8e' }}
+              /* 與統計頁的拔河條共用同一組人物色階（base.css --person-1..4） */
+              style={{ ['--card-accent' as string]: i === 0 ? 'var(--person-1)' : 'var(--person-2)' }}
             >
               <div className="money-name">{p.name}</div>
               <div className="money-amount tnum">{formatNTD(totals.get(p.id) ?? 0)}</div>

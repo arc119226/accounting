@@ -10,7 +10,8 @@ export interface SplitPerson {
   readonly total: number;
 }
 
-const COLORS = ['var(--gold)', '#3d6b8e', '#2e7d64', '#7d5a8e'] as const;
+/** 人物色階住 base.css：帳本的兩人小計卡本來各寫一份，其實是同一組（見 --person-1..4） */
+const COLORS = ['var(--person-1)', 'var(--person-2)', 'var(--person-3)', 'var(--person-4)'] as const;
 
 function TugOfWar({ a, b }: { a: SplitPerson; b: SplitPerson }) {
   const sum = a.total + b.total;

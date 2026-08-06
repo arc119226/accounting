@@ -65,7 +65,7 @@ function MonthSummaryCard({ rows, month }: { rows: readonly ExpenseRecord[]; mon
             const cat = categories.get(m.categoryId);
             return (
               <div key={m.categoryId} className="cat-row">
-                <CategorySeal glyph={cat?.glyph ?? '雜'} color={cat?.color ?? '#6e6046'} />
+                <CategorySeal glyph={cat?.glyph ?? '雜'} color={cat?.color ?? 'var(--dim)'} />
                 <span className="cat-name">{cat?.name ?? m.categoryId}</span>
                 <span className={`tnum${m.delta > 0 ? ' over-red' : ' mover-down'}`}>
                   {m.delta > 0 ? '+' : '−'}
@@ -238,7 +238,7 @@ export function StatsScreen() {
                     className={`legend-row${pickedCat === c.categoryId ? ' active' : ''}`}
                     onClick={() => setPickedCat(pickedCat === c.categoryId ? null : c.categoryId)}
                   >
-                    <CategorySeal glyph={cat?.glyph ?? '雜'} color={cat?.color ?? '#6e6046'} />
+                    <CategorySeal glyph={cat?.glyph ?? '雜'} color={cat?.color ?? 'var(--dim)'} />
                     <span className="legend-name">{cat?.name ?? c.categoryId}</span>
                     <span className="legend-count dim-text tnum">
                       {c.count}
