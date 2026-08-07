@@ -8,6 +8,24 @@
 /fonts/*
   Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
-# PWA 殼（M5）：SW 主檔要立即更新；offline.html 由 SW 預快取
+# PWA 殼（M5）：SW 主檔要立即更新（離線導覽走 navigateFallback → index.html，沒有 offline.html）
 /sw.js
   Cache-Control: no-cache
+
+# index.html 與 SPA 入口**不可長快取**（審查修正）：它指名的是帶 hash 的 assets，
+# 而那些檔案在下一次部署就從 dist 消失了。非 SW 控制的 client（首訪、iOS 把 SW 回收後、
+# 隱私視窗、使用者停用 SW）若拿到帶 max-age 的舊 index.html ⇒ 它引用的 JS 全部 404 ⇒
+# 白畫面，而 version.json 的輪詢救不了（bundle 根本沒載進來）。
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+
+# manifest 與根層圖示是「同名替換」檔（同 /fonts/*）：短新鮮窗 + SWR，
+# 誤上 immutable 會讓換圖示一年不生效
+/manifest.webmanifest
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/*.png
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+/favicon.svg
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400

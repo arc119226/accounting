@@ -101,6 +101,33 @@ describe('styles barrel（順序即契約）', () => {
     );
   });
 
+  /**
+   * reduced-motion 的政策點宣稱自己是全站唯一，但它只涵蓋 @keyframes——
+   * `transition` 完全在守備範圍外，於是 `.note-chip`（`.paper-label` 的躺平版孿生元件、
+   * 同一組 transition）默默漏了很久。這條把 transition 也納進來。
+   */
+  it('有 transition 的互動元件都要在 motion.css 的 reduced-motion 清單裡', () => {
+    const motion = strip(leaf('motion.css'));
+    // motion.css 自己的規則不算來源
+    const declared = new Set<string>();
+    for (const m of motion.matchAll(/\.([a-z][\w-]*)/g)) declared.add(m[1]!);
+    const missing: string[] = [];
+    for (const name of onDisk) {
+      if (name === 'motion.css') continue;
+      const body = strip(leaf(name));
+      for (const rule of body.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+        if (!/(^|[;\s])transition:/.test(rule[2]!)) continue;
+        for (const sel of rule[1]!.split(',')) {
+          const last = sel.trim().split(/\s+/).pop() ?? '';
+          const cls = /^\.([a-z][\w-]*)/.exec(last)?.[1];
+          // 只管 class 選擇器；偽類（:hover 等）跟著本體走
+          if (cls && !declared.has(cls)) missing.push(`${name}: .${cls}`);
+        }
+      }
+    }
+    expect([...new Set(missing)], '這些元件有 transition 但沒進 motion.css 的 reduced-motion 清單').toEqual([]);
+  });
+
   it('motion.css 補回 stroke-dashoffset 終值（只寫 animation:none 會讓統計圖永久空白）', () => {
     const body = fs.readFileSync(path.join(LEAF_DIR, 'motion.css'), 'utf8');
     expect(body).toMatch(/stroke-dashoffset:\s*0/);

@@ -240,10 +240,6 @@ body {
   to { opacity: 1; transform: none; }
 }
 
-/* 載完淡入的圖（ui/FadeImg.tsx） */
-.fade-img { opacity: 0; transition: opacity 260ms ease; }
-.fade-img.loaded { opacity: 1; }
-
 /* 全域焦點環：亮金（鍵盤可達性） */
 :is(.primary-btn, .ghost-btn, .seg-btn, .danger-btn, .nav-btn, .corner-btn):focus-visible {
   outline: 2px solid var(--gold-bright);

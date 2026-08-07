@@ -12,7 +12,9 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- black-translucent 配 viewport-fit=cover + 全面的 env(safe-area-inset-*)：
+         default 是淺底黑字，夜墨下狀態列與內容之間會留一條不隨主題變的淺色帶 -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="柴米帳" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="preload" as="font" href="/fonts/zb-brush.woff2" type="font/woff2" crossorigin />
