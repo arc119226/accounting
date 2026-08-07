@@ -80,7 +80,11 @@ function RulesCard() {
                 </option>
               ))}
             </select>
-            <button className="ghost-btn cat-tool danger-ghost" onClick={() => deleteRule(r.id)}>
+            <button
+              className="ghost-btn cat-tool danger-ghost"
+              aria-label={`${RULES.deleteRule}：${r.displayName || r.id}`}
+              onClick={() => deleteRule(r.id)}
+            >
               ✕
             </button>
           </div>
@@ -133,7 +137,11 @@ export function CategoriesScreen() {
                 ▼
               </button>
               {!c.builtin && (
-                <button className="ghost-btn cat-tool danger-ghost" onClick={() => setDeleting(c.id)}>
+                <button
+                  className="ghost-btn cat-tool danger-ghost"
+                  aria-label={`${CATEGORIES.deleteConfirm}：${c.name}`}
+                  onClick={() => setDeleting(c.id)}
+                >
                   ✕
                 </button>
               )}

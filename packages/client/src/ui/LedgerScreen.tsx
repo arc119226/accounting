@@ -63,22 +63,60 @@ function DayGroup({ date, rows }: { date: string; rows: ExpenseRecord[] }) {
   );
 }
 
-/** 備份提醒：距上次同步/匯出 >30 天且帳上有記錄才出現（新用戶不騷擾） */
+const DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * 備份提醒。門檻**看瀏覽器有沒有承諾不回收**（審查修正）。
+ *
+ * 舊版一律 30 天、且從未備份時要求帳上 >30 筆才提醒。問題是 WebKit 在分頁模式下
+ * 不給持久性，而且是「7 天沒開站就把 IDB 連同 SW 一起清掉」——30 天的提醒必然在
+ * 資料已經沒了之後才響，而記了 20 筆的人（20 > 30 為 false）連響都不會響。
+ *
+ * 現在：拿到 persist ⇒ 維持 30 天（Chromium 冪等、風險低）；
+ * 沒拿到 ⇒ 3 天、且只要帳上有活記錄就提醒。3 天是刻意壓在 7 天窗內。
+ */
 function BackupNag() {
   const settings = useAppStore((s) => s.settings);
   const peers = useAppStore((s) => s.peers);
   const records = useAppStore((s) => s.records);
+  const persisted = useAppStore((s) => s.persisted);
   const setScreen = useAppStore((s) => s.setScreen);
   if (records.size === 0) return null;
+  const atRisk = persisted === false;
   const lastCare = Math.max(settings.lastExportMs, ...peers.map((p) => p.lastSyncWallMs), 0);
-  // 從未備份：以第一筆記錄存在即開始計時的話會立刻騷擾新用戶——放寬為「從未+帳上>30筆」
+  const maxAge = (atRisk ? 3 : 30) * DAY;
   const stale = lastCare > 0
-    ? Date.now() - lastCare > 30 * 24 * 60 * 60 * 1000
-    : records.size > 30;
+    ? Date.now() - lastCare > maxAge
+    // 從未備份過：以第一筆記錄開始計時會立刻騷擾新用戶，所以看筆數。
+    // 但沒受保護時「筆數多寡」不是重點——回收是無差別的，有帳就該提醒。
+    : atRisk || records.size > 30;
   if (!stale) return null;
   return (
     <button className="backup-nag" onClick={() => setScreen('sync')}>
-      {SYNC.backupNag}
+      {atRisk ? SYNC.backupNagAtRisk : SYNC.backupNag}
+    </button>
+  );
+}
+
+/**
+ * iOS 未安裝時的安裝提示。**放在帳本頁**而不是只放設定頁（審查修正）：
+ * 原本要使用者自己走進設定頁才看得到，而會被 7 天回收清掉的正是那些
+ * 「在 Safari 分頁裡用一用就沒再開」的人——他們最不可能去逛設定頁。
+ * 只在真的沒拿到持久性時出現，拿到了就不囉嗦。
+ */
+function IosInstallNag() {
+  const persisted = useAppStore((s) => s.persisted);
+  const records = useAppStore((s) => s.records);
+  const setScreen = useAppStore((s) => s.setScreen);
+  if (persisted !== false || records.size === 0) return null;
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const standalone =
+    ('standalone' in navigator && (navigator as { standalone?: boolean }).standalone === true) ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if (!isIos || standalone) return null;
+  return (
+    <button className="backup-nag" onClick={() => setScreen('settings')}>
+      {SYNC.installNag}
     </button>
   );
 }
@@ -91,6 +129,7 @@ export function LedgerScreen() {
   const openEntry = useAppStore((s) => s.openEntry);
   const persons = useAppStore((s) => s.persons);
   const personFilter = useAppStore((s) => s.personFilter);
+  const hydrated = useAppStore((s) => s.hydrated);
   const listRef = useRef<HTMLDivElement>(null);
 
   const { groups, totals, monthTotal } = useMemo(() => {
@@ -140,11 +179,11 @@ export function LedgerScreen() {
             斷行是用 hypothetical size 判定的（**先斷行、後收縮**），橫幅一寬就把「›」
             擠到第二列。合計改由外層的 column 排到第二列，兩顆箭頭永遠與橫幅同列。 */}
         <div className="month-row">
-          <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, -1))}>
+          <button className="ghost-btn month-arrow" aria-label={LEDGER.prevMonth} onClick={() => setMonth(addMonths(monthCursor, -1))}>
             ‹
           </button>
           <div className="scroll-banner month-banner">{formatMonthZh(monthCursor)}</div>
-          <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, 1))}>
+          <button className="ghost-btn month-arrow" aria-label={LEDGER.nextMonth} onClick={() => setMonth(addMonths(monthCursor, 1))}>
             ›
           </button>
         </div>
@@ -172,9 +211,16 @@ export function LedgerScreen() {
 
       {familyView && <BudgetTotalBrush progress={budgetProg} compact />}
 
+      <IosInstallNag />
+
       <BackupNag />
 
-      {groups.length === 0 ? (
+      {/* hydrate 是 async，期間 records 還是空 Map ⇒ 舊版直接畫「這個月還沒有記錄」。
+          10 年 3 萬筆時 loadAll 在行動端約 0.7–2 秒，使用者會先看到那句 1–2 秒——
+          對一個「手機掉了怎麼辦」本來就焦慮的 app，那個假訊號比慢本身嚴重。 */}
+      {!hydrated ? (
+        <p className="dim-text empty-hint">{LEDGER.loading}</p>
+      ) : groups.length === 0 ? (
         <p className="dim-text empty-hint">{LEDGER.emptyMonth}</p>
       ) : (
         groups.map((g) => <DayGroup key={g.date} date={g.date} rows={g.rows} />)

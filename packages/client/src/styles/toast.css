@@ -4,10 +4,20 @@
   /* 讓開底部導覽列與軟鍵盤。76 = 導覽列 56 + 20 餘裕，但導覽列高是
      max(56px, 字級撐出來的高) ⇒ 大字級時 76 不夠，toast 會壓在導覽列上。 */
   bottom: calc(max(76px, 2.6em + 20px) + env(safe-area-inset-bottom, 0px) + var(--kb, 0px));
-  left: 50%;
-  transform: translateX(-50%);
+  /* left:0 + right:0 + margin auto，**不是** left:50% + translateX(-50%)（審查修正）。
+     fixed 元素只給 left 時，shrink-to-fit 的可用寬度是「從 left 到視窗右緣」＝50vw，
+     於是下面那行 max-width: min(92vw, 420px) 永遠用不到——量到的寬固定是 187.5px。
+     100% 字級時內容剛好塞得下所以沒人發現；150% 起整個 toast 會塌成
+     一行一個字的直條（實測 200% 時「新版本已就緒」六個字疊成 210px 高）。 */
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
   display: flex;
   align-items: center;
+  /* 大字級下讓按鈕掉到第二行，而不是被壓成直書 */
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
   background: var(--toast-bg);
   border: 1px solid var(--note-line);
@@ -18,8 +28,8 @@
   z-index: 90;
   box-shadow: var(--shadow-toast);
   animation: fadein 0.15s ease;
-  /* fixed + translateX(-50%) + nowrap + 無 max-width ⇒ 字串一長就同時溢出兩側，
-     不可捲也不可見。目前最長的字串還撐得住，但這是三行保險。 */
+  /* 上面改成 left/right:0 + margin auto 之後這條才真的生效（原本被 50vw 的
+     可用寬度蓋過去）。字串一長就同時溢出兩側、不可捲也不可見，所以這條要留著。 */
   max-width: min(92vw, 420px);
   white-space: normal;
   /* toast 會報金額（已記一筆 $250），金額一律等寬 */

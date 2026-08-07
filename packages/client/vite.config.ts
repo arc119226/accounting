@@ -20,12 +20,19 @@ export default defineConfig({
         this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ id: buildId }) });
       },
     },
-    // PWA：generateSW + autoUpdate——此 app 核心價值是**離線記帳**，
-    // 殼+JS+字體+zxing wasm 全 precache（有別於 sr2「殼頁級 SW 永不快取 bundle」的取捨：
-    // sr2 是線上遊戲，reload=新版比離線重要）。staleness 由 autoUpdate（skipWaiting+
-    // clientsClaim）夾在一個啟動內，再疊 version.json 輪詢的使用者可見 toast。
+    // PWA：generateSW——此 app 核心價值是**離線記帳**，殼+JS+字體+zxing wasm 全 precache
+    // （有別於 sr2「殼頁級 SW 永不快取 bundle」的取捨：sr2 是線上遊戲，reload=新版比離線重要）。
+    //
+    // registerType 維持 'autoUpdate'（產出的 sw.js 帶 skipWaiting + clientsClaim），
+    // 但 **injectRegister: null**（審查修正）：plugin 注入的 registerSW.js 只有一行
+    // register()，沒有 controllerchange、沒有 reload，所以舊註解宣稱的
+    // 「staleness 夾在一個啟動內」並不成立——使用者按「重新整理」時那次導覽會被
+    // 舊 SW 用舊 precache 的 index.html 接住，得按第二次才會中。
+    // 改由 src/version.ts 的 initServiceWorker() 自己註冊與接線（只用標準 SW API，
+    // 不為了這 20 行拉進 workbox-window）。
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: null,
       manifest: false, // 用 public/ 的手寫 manifest.webmanifest（zh-Hant 欄位齊全）
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2,wasm,png,webmanifest}'],

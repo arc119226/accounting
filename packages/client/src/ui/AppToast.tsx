@@ -3,7 +3,8 @@
  * 存檔失敗、記帳成功、刪除復原（帶動作鈕）。常掛在 App.tsx 尾端。
  */
 import { useEffect, useSyncExternalStore } from 'react';
-import { dismiss, getNotice, subscribe, type NoticeKind } from '../notice';
+import { dismiss, dismissSticky, getNotice, subscribe, type NoticeKind } from '../notice';
+import { updateApp } from '../version';
 import { useAppStore } from '../store/appStore';
 import { NOTICE } from '../strings/ui';
 
@@ -41,9 +42,17 @@ export function AppToast() {
     <div className={`app-toast${place}`} role="status">
       <span>{text}</span>
       {notice.kind === 'updateReady' && (
-        <button className="app-toast-btn" onClick={() => location.reload()}>
-          {NOTICE.updateBtn}
-        </button>
+        <>
+          {/* updateApp 走 SW 的 updateSW(true)（skipWaiting + 接管 + reload），
+              拿不到才退回 location.reload()——單純 reload 會被舊 SW 用舊 index.html 接住 */}
+          <button className="app-toast-btn" onClick={() => void updateApp()}>
+            {NOTICE.updateBtn}
+          </button>
+          {/* 沒有關閉鈕的話它會一直佔著底部（v4 量過那個位置會壓到 FAB） */}
+          <button className="app-toast-btn" aria-label={NOTICE.dismiss} onClick={dismissSticky}>
+            ✕
+          </button>
+        </>
       )}
       {action && (
         <button

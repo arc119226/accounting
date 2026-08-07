@@ -3,7 +3,7 @@
  * 金額走自製數字鍵盤（整數元；行動裝置系統鍵盤會蓋半屏又常彈小數）。
  * 重複防呆：同日同額同人 → ConfirmDialog 警告不硬擋。
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { formatNTD, monthOf, sortCategories, suggestNotes } from '@zhangben/core';
 import { useAppStore } from '../store/appStore';
 import { getPersonId } from '../ids';
@@ -13,6 +13,7 @@ import { findDuplicate, todayISO, type EntryValues } from '../store/ledgerSlice'
 import { ConfirmDialog } from './ConfirmDialog';
 import { ENTRY, NOTICE, SCAN } from '../strings/ui';
 import { show, showAction } from '../notice';
+import { useDialog } from './useDialog';
 
 const KEYPAD = ['7', '8', '9', '4', '5', '6', '1', '2', '3', 'C', '0', '⌫'] as const;
 const MAX_AMOUNT = 99_999_999;
@@ -101,10 +102,21 @@ export function EntrySheet() {
   })();
 
   const title = editing ? ENTRY.titleEdit : ENTRY.titleNew;
+  const sheetRef = useRef<HTMLDivElement>(null);
+  // 抽屜是全 app 最常開關的東西，原本連 Esc 都沒有（只有 ConfirmDialog 有），
+  // 焦點也留在被 scrim 蓋住的觸發鈕上。點背景關閉是滑鼠/觸控專屬，鍵盤沒有等價出口。
+  useDialog(sheetRef, { onClose: closeEntry });
 
   return (
     <div className="sheet-overlay" onClick={closeEntry}>
-      <div className="entry-sheet" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="entry-sheet"
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* 三段式：頭（標題＋金額）與尾（入帳鈕）**移出捲動區**，中段才捲。
             這樣「金額」與「入帳」在任何字級、任何視窗高、鍵盤開著時都不會被推出視野，
             也不必動用 position:sticky——sticky 的貼齊點是 scrollport(padding box)、

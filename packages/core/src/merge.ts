@@ -64,8 +64,18 @@ export interface MergeSummary {
 export function mergeAll<T extends Syncable>(
   local: ReadonlyMap<string, T>,
   incoming: readonly T[],
-): { readonly next: ReadonlyMap<string, T>; readonly summary: MergeSummary } {
+): {
+  readonly next: ReadonlyMap<string, T>;
+  readonly summary: MergeSummary;
+  /**
+   * 實際被採納的 id。呼叫端要落盤的就是這些列——沒有這份清單就只能走訪整個
+   * next 去比對參照，那是一趟 O(全帳) 的掃描，而同步是一批一批來的
+   * ⇒ 掃描量變成 n × 批次數。
+   */
+  readonly taken: readonly string[];
+} {
   const next = new Map(local);
+  const taken: string[] = [];
   let added = 0;
   let updated = 0;
   let skipped = 0;
@@ -84,12 +94,13 @@ export function mergeAll<T extends Syncable>(
     }
 
     next.set(row.id, row);
+    taken.push(row.id);
     if (existing === undefined) added += 1;
     if (existing !== undefined && !row.deleted) updated += 1;
     if (row.deleted) deletes += 1;
   }
 
-  return { next, summary: { added, updated, skipped, deletes } };
+  return { next, summary: { added, updated, skipped, deletes }, taken };
 }
 
 /**

@@ -96,6 +96,7 @@ export function SyncScreen() {
   const persons = useAppStore((s) => s.persons);
   const importSummary = useAppStore((s) => s.importSummary);
   const importFailed = useAppStore((s) => s.importFailed);
+  const importProgress = useAppStore((s) => s.importProgress);
   const hostSync = useAppStore((s) => s.hostSync);
   const joinSync = useAppStore((s) => s.joinSync);
   const cancelSync = useAppStore((s) => s.cancelSync);
@@ -318,6 +319,13 @@ export function SyncScreen() {
           <button className="ghost-btn" onClick={() => fileRef.current?.click()}>{SYNC.importBtn}</button>
         </div>
         {importFailed && <p className="sync-err over-red">{SYNC.importFailed}</p>}
+        {/* 匯入 3 萬筆要好幾秒。沒有這行的話畫面完全靜止，而這正是使用者剛失去資料、
+            正在救回來的時刻——「按了沒反應」的感受在這裡代價最大。 */}
+        {importProgress && (
+          <p className="dim-text sync-status tnum">
+            {SYNC.importing(importProgress.done, importProgress.total)}
+          </p>
+        )}
         {importSummary && (
           <SummaryCard
             totals={importSummary}

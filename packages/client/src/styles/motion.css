@@ -26,8 +26,9 @@
   .seg-btn,
   .corner-btn,
   .paper-label,
-  .nav-btn,
-  .fade-img {
+  /* .note-chip 是 .paper-label 的躺平版孿生元件，同一組 transition，原本漏了 */
+  .note-chip,
+  .nav-btn {
     transition-duration: 1ms;
   }
 

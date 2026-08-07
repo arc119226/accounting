@@ -363,7 +363,9 @@ export function ScanScreen() {
       {!result && (
         <>
           <div className="scan-viewport">
-            <video ref={videoRef} className="scan-video" muted />
+            {/* playsInline 不可少：少了它 iOS 會把相機流拿去全螢幕播放（同檔 SyncScreen 的
+                同款 video 有，這裡漏了）。aria-hidden：即時影像對輔助技術沒有意義。 */}
+            <video ref={videoRef} className="scan-video" muted playsInline aria-hidden="true" />
             {phase === 'camera' && (
               <div className="scan-frame" aria-hidden="true">
                 <div className="scan-target" />

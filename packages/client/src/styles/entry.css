@@ -191,7 +191,7 @@
   transition: box-shadow 0.15s ease, filter 0.15s ease;
 }
 .note-chip:hover { filter: brightness(1.06); }
-.note-chip.active { outline: 2px solid var(--scroll-zhu); outline-offset: 1px; }
+.note-chip.active { outline: 2px solid var(--scroll-zhu); outline-offset: 1px; font-weight: 700; }
 
 /* 兩顆等寬分欄：任何字級下都只有**一條**對齊規則（grid 分欄），不再是 flex 換行後
    第一行歸 justify-content、第二行歸 auto margin 的兩套。

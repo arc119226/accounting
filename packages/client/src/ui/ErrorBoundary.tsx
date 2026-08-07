@@ -39,7 +39,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="crash-screen">
         <div className="modal-card crash-card">
-          <div className="modal-title">{CRASH.title}</div>
+          <h2 className="modal-title">{CRASH.title}</h2>
           <div className="modal-body">{CRASH.body}</div>
           {digest && <div className="crash-digest">{digest}</div>}
           <div className="modal-actions">

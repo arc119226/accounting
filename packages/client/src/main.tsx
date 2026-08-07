@@ -2,7 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { initErrorLog } from './errlog';
-import { APP_VERSION, initUpdateCheck } from './version';
+import { APP_VERSION, initServiceWorker, initUpdateCheck } from './version';
 import { setSaveErrorHandler } from './storage';
 import { initKeyboardInsets } from './keyboard';
 import { show } from './notice';
@@ -13,7 +13,9 @@ import './styles.css';
 
 // 可觀測性：render 前掛全域錯誤日誌（ErrorBoundary 接不到的 async/動態 import 全在這）
 initErrorLog(APP_VERSION);
-// 更新偵測（DEV 早退）：visibilitychange + 10 分鐘輪詢 version.json
+// 更新偵測兩道並存：SW 自己的更新（準，且能保證一次就換版）＋ version.json 輪詢
+// （SW 被 iOS 回收或使用者停用 SW 時還在）。兩道都住 version.ts。
+initServiceWorker();
 initUpdateCheck();
 // 軟鍵盤讓位：量 visualViewport 寫 --kb（iOS 專用；Android 靠 viewport meta 自己縮）
 initKeyboardInsets();
@@ -32,7 +34,11 @@ setSaveErrorHandler(() => {
 // 開機：載入帳本（首次啟動 seed 內建分類）+ peers + 申請持久儲存（WebKit 每次會話重問，冪等）
 void useAppStore.getState().hydrate();
 void useAppStore.getState().loadPeers();
-void import('./db/persist').then((m) => m.requestPersist());
+// persist 的結果**要記下來**：舊版用 void 丟掉，於是程式完全不知道自己沒受保護，
+// 而備份提醒的門檻又比 WebKit 的 7 天回收窗大四倍 ⇒ 三道防線同時失效且全程零警告。
+void import('./db/persist').then(async (m) => {
+  useAppStore.getState().setPersisted(await m.requestPersist());
+});
 
 // 同步 deep link：**只記意圖、不入房**。原本這裡直接 joinSync()，但 hydrate() 是 async——
 // 此刻 records 還是空的，而以空帳本完成的握手會把 checkpoint 推到頂、讓這台的帳從此
