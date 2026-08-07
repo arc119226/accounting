@@ -24,28 +24,60 @@ export interface ReconcileResult {
   readonly next: ReadonlyMap<string, ExpenseRecord>;
   /** 被轉墓碑的重複筆數（同步摘要的「去重」項；不含純剝號自癒） */
   readonly deduped: number;
+  /**
+   * 本輪改寫過的 id（含剝號自癒與敗者墓碑）。呼叫端要落盤這些列，
+   * 而它們**不一定**是 incoming 裡的列——沒有這份清單就只能重掃整本帳去比對參照。
+   */
+  readonly changedIds: readonly string[];
 }
 
+/**
+ * `touched`：只有這些 id 的列在本輪動過。
+ *
+ * 同步是一批 500 列、一批一批來的，而每批都重建整本帳的 byNumber ⇒ 掃描量是
+ * n × ⌈n/500⌉。3,000 筆時量不到，30,000 筆時是幾百萬次操作，而觸發時機正是
+ * 「換新手機第一次全量同步」。
+ *
+ * 增量是**安全的**，因為重複只可能由本批動過的列造成：沒被動到的列彼此之間的
+ * 重複關係，上一輪就已經調和過了（呼叫端每批都調和）。帶號墓碑的自癒同理。
+ * 省略 touched ⇒ 全掃（檔案匯入、測試、以及任何不確定的呼叫端都走這條）。
+ */
 export function reconcileInvoiceDuplicates(
   records: ReadonlyMap<string, ExpenseRecord>,
   envelope: FreshEnvelope,
+  touched?: Iterable<string>,
 ): ReconcileResult {
   // 先收集：號碼 → 活記錄 id 清單（排序後決定存活者；Map 迭代序不可依賴）
   const byNumber = new Map<string, string[]>();
   let next: Map<string, ExpenseRecord> | null = null; // 無事可做=零配置直接回傳原 Map
+  const changedIds: string[] = [];
+
+  // 增量模式：先算出「本批碰過哪些號碼」，全帳只挑這些號碼的列進 byNumber。
+  // null = 全掃。
+  let hotNumbers: Set<string> | null = null;
+  if (touched !== undefined) {
+    hotNumbers = new Set<string>();
+    for (const id of touched) {
+      const r = records.get(id);
+      if (r?.invoice) hotNumbers.add(r.invoice.number);
+    }
+  }
 
   for (const r of records.values()) {
     if (r.deleted) {
-      // 自癒：帶號墓碑剝除 invoice（釋放 unique index；重寫=新事件）
-      if (r.invoice) {
+      // 自癒：帶號墓碑剝除 invoice（釋放 unique index；重寫=新事件）。
+      // 增量模式下只自癒本批碰過的——沒碰到的墓碑上一輪就處理過了。
+      if (r.invoice && (hotNumbers === null || hotNumbers.has(r.invoice.number))) {
         next ??= new Map(records);
         const { invoice: _dropped, ...rest } = r;
         void _dropped;
         next.set(r.id, { ...rest, ...envelope });
+        changedIds.push(r.id);
       }
       continue;
     }
     if (!r.invoice) continue;
+    if (hotNumbers !== null && !hotNumbers.has(r.invoice.number)) continue;
     const list = byNumber.get(r.invoice.number) ?? [];
     list.push(r.id);
     byNumber.set(r.invoice.number, list);
@@ -61,10 +93,11 @@ export function reconcileInvoiceDuplicates(
       const { invoice: _dropped, ...rest } = loser;
       void _dropped;
       next.set(loserId, { ...rest, deleted: true, ...envelope });
+      changedIds.push(loserId);
       deduped += 1;
     }
   }
-  return { next: next ?? records, deduped };
+  return { next: next ?? records, deduped, changedIds };
 }
 
 /**

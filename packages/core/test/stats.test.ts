@@ -490,7 +490,21 @@ describe('monthSummary', () => {
         expect(got.total).toBe(sum(cur));
         expect(got.prevTotal).toBe(sum(prv));
         expect(got.delta).toBe(sum(cur) - sum(prv));
-        expect(got.deltaPct).toBe(sum(prv) === 0 ? null : Math.round(((sum(cur) - sum(prv)) / sum(prv)) * 100));
+        // deltaPct 不用 oracle 對照，改**斷言規格本身**（審查修正）：
+        // 這裡原本寫 Math.round(...)，而 v5 已把實作改成 away-from-zero 且消掉 -0——
+        // 於是這條在 fast-check 抽到 ±.5 邊界或「小負數捨入成 0」時會**間歇性**變紅
+        // （-0 與 0 在 toBe 的 Object.is 下不相等）。抄一份實作當 oracle 只會讓它變成
+        // 恆真的同義反覆，所以改成驗三條性質。
+        if (sum(prv) === 0) {
+          expect(got.deltaPct).toBeNull();
+        } else {
+          const exact = ((sum(cur) - sum(prv)) / sum(prv)) * 100;
+          const pct = got.deltaPct!;
+          expect(Number.isInteger(pct)).toBe(true);
+          expect(Math.abs(pct - exact)).toBeLessThanOrEqual(0.5); // 捨入到最近的整數
+          expect(Math.sign(pct) === 0 || Math.sign(pct) === Math.sign(exact)).toBe(true); // 不換號
+          expect(Object.is(pct, -0)).toBe(false); // 畫面上不准出現「-0%」
+        }
         // 最大單筆：同額取 id 最小
         const best = cur.reduce<ExpenseRecord | null>(
           (m, x) => (m === null || x.amount > m.amount || (x.amount === m.amount && x.id < m.id) ? x : m),

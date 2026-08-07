@@ -129,6 +129,7 @@ export function LedgerScreen() {
   const openEntry = useAppStore((s) => s.openEntry);
   const persons = useAppStore((s) => s.persons);
   const personFilter = useAppStore((s) => s.personFilter);
+  const hydrated = useAppStore((s) => s.hydrated);
   const listRef = useRef<HTMLDivElement>(null);
 
   const { groups, totals, monthTotal } = useMemo(() => {
@@ -214,7 +215,12 @@ export function LedgerScreen() {
 
       <BackupNag />
 
-      {groups.length === 0 ? (
+      {/* hydrate 是 async，期間 records 還是空 Map ⇒ 舊版直接畫「這個月還沒有記錄」。
+          10 年 3 萬筆時 loadAll 在行動端約 0.7–2 秒，使用者會先看到那句 1–2 秒——
+          對一個「手機掉了怎麼辦」本來就焦慮的 app，那個假訊號比慢本身嚴重。 */}
+      {!hydrated ? (
+        <p className="dim-text empty-hint">{LEDGER.loading}</p>
+      ) : groups.length === 0 ? (
         <p className="dim-text empty-hint">{LEDGER.emptyMonth}</p>
       ) : (
         groups.map((g) => <DayGroup key={g.date} date={g.date} rows={g.rows} />)

@@ -47,6 +47,8 @@ export const PLACEHOLDER = {
 
 export const LEDGER = {
   emptyMonth: '本月尚無記錄，落筆自今日始。',
+  /** hydrate 還沒完成時的字。與 emptyMonth 分開：「還沒載完」與「真的沒有」是兩件事 */
+  loading: '正在翻開帳本…',
   addEntry: '記一筆',
   einvoiceChip: '電',
   weekdays: ['週日', '週一', '週二', '週三', '週四', '週五', '週六'],
@@ -188,6 +190,8 @@ export const SYNC = {
   exported: '帳本已匯出',
   exportFailed: '匯出失敗——請再試一次',
   importFailed: '這不是柴米帳的備份檔，或檔案已損毀。',
+  /** 匯入進度。大帳本要好幾秒，沒有進度＝與「按了沒反應」不可區分 */
+  importing: (done: number, total: number) => `正在還原… ${done} / ${total} 筆`,
   backupNag: '已超過 30 天沒有同步或備份——花一分鐘匯出一份吧。',
   /** 沒拿到持久儲存承諾時的版本：講後果，因為這裡的時限是瀏覽器定的不是我們定的 */
   backupNagAtRisk: '這個瀏覽器沒有承諾保留帳本，久沒開啟就可能被清掉——現在匯出一份。',
@@ -218,6 +222,8 @@ export const STATS = {
   moversTitle: '變動最大',
   largestTitle: '本月最大一筆',
   countSuffix: ' 筆',
+  /** 分類明細有上限（見 StatsScreen 的 PICKED_LIMIT）；截掉的部分要說出來 */
+  pickedMore: (n: number) => `還有 ${n} 筆——縮小區間看得更清楚`,
 } as const;
 
 export const BUDGET = {

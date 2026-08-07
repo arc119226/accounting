@@ -7,7 +7,7 @@
  * await——失敗 throw 給呼叫端走 apply-failed（協定不完成、checkpoint 不存、下次重送）。
  */
 import type { StateCreator } from 'zustand';
-import type { Budget, Syncable } from '@zhangben/core';
+import type { Budget, Category, ExpenseRecord, MerchantRule, Person, Syncable } from '@zhangben/core';
 import type { AppStore } from './appStore';
 import * as repo from '../db/repo';
 import { recvClock, tickClock } from '../clock';
@@ -21,6 +21,8 @@ import { logError } from '../errlog';
 import { show } from '../notice';
 
 const EMPTY_TOTALS: SyncTotals = { added: 0, updated: 0, skipped: 0, deletes: 0, deduped: 0, rejected: 0 };
+/** 匯入的切塊大小。與 trystero 的 BATCH_SIZE 同值，理由也同——單一交易的體積不該綁在帳本大小上 */
+const IMPORT_CHUNK = 500;
 
 export interface SyncSlice {
   peers: readonly repo.PeerInfo[];
@@ -32,6 +34,8 @@ export interface SyncSlice {
   /** 檔案匯入的結果摘要（與 P2P 共用同一張卡） */
   importSummary: SyncTotals | null;
   importFailed: boolean;
+  /** 匯入進度（null=沒在跑）。3 萬筆時那幾秒沒有回饋＝與「按了沒反應」不可區分 */
+  importProgress: { readonly done: number; readonly total: number } | null;
   /**
    * deep link／掃碼帶進來、**尚未執行**的房間碼。
    * 開機當下不入房：hydrate 是 async（帳本還沒載完），而且空帳本也可能是
@@ -72,25 +76,25 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
           deviceId: getDeviceId(),
         });
         out = d as ApplyDecision<Syncable>;
-        return { records: new Map(d.next) };
+        return { records: d.next as Map<string, ExpenseRecord> };
       });
     } else if (kind === 'categories') {
       set((cur) => {
         const d = decideIncoming(cur.categories, rows as never, null);
         out = d as ApplyDecision<Syncable>;
-        return { categories: new Map(d.next) };
+        return { categories: d.next as Map<string, Category> };
       });
     } else if (kind === 'rules') {
       set((cur) => {
         const d = decideIncoming(cur.rules, rows as never, null);
         out = d as ApplyDecision<Syncable>;
-        return { rules: new Map(d.next) };
+        return { rules: d.next as Map<string, MerchantRule> };
       });
     } else if (kind === 'persons') {
       set((cur) => {
         const d = decideIncoming(cur.persons, rows as never, null);
         out = d as ApplyDecision<Syncable>;
-        return { persons: new Map(d.next) };
+        return { persons: d.next as Map<string, Person> };
       });
     } else {
       set((cur) => {
@@ -200,6 +204,7 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
     clockDriftMs: null,
     importSummary: null,
     importFailed: false,
+    importProgress: null,
     pendingJoin: null,
 
     async loadPeers() {
@@ -299,21 +304,34 @@ export const createSyncSlice: StateCreator<AppStore, [], [], SyncSlice> = (set, 
         ['rules', env.rules],
         ['budget', env.budget ? [env.budget] : []],
       ];
+      const total = batches.reduce((n, [, rows]) => n + rows.length, 0);
+      let done = 0;
+      set({ importProgress: { done, total } });
       try {
         for (const [kind, rows] of batches) {
           if (rows.length === 0) continue;
-          const r = await applyBatch(kind, rows);
-          totals.added += r.summary.added;
-          totals.updated += r.summary.updated;
-          totals.skipped += r.summary.skipped;
-          totals.deletes += r.summary.deletes;
-          totals.deduped += r.deduped;
-          totals.rejected += r.rejected; // parseImport 已整檔把關，這裡恆為 0——留著是為了兩條路共用同一張摘要卡
+          // **切塊**（審查修正）：P2P 有 BATCH_SIZE 切塊，匯入原本是整批一次餵——
+          // repo.persistRows 於是在單一交易裡跑 3 萬次 put（行動端 1–4 秒完全鎖住），
+          // 而畫面上什麼都沒有（importSummary/importFailed 開頭就被清空了），
+          // 與「按了沒反應」不可區分。這是 app 最脆弱的時刻：使用者剛失去資料、正在救回來。
+          for (let i = 0; i < rows.length; i += IMPORT_CHUNK) {
+            const r = await applyBatch(kind, rows.slice(i, i + IMPORT_CHUNK));
+            totals.added += r.summary.added;
+            totals.updated += r.summary.updated;
+            totals.skipped += r.summary.skipped;
+            totals.deletes += r.summary.deletes;
+            totals.deduped += r.deduped;
+            totals.rejected += r.rejected; // parseImport 已整檔把關，這裡恆為 0——留著是為了兩條路共用同一張摘要卡
+            done += Math.min(IMPORT_CHUNK, rows.length - i);
+            set({ importProgress: { done, total } });
+            // 讓一次事件迴圈：進度條才畫得出來，也讓使用者的觸控不被整段餓死
+            await new Promise<void>((r2) => setTimeout(r2, 0));
+          }
         }
-        set({ importSummary: totals });
+        set({ importSummary: totals, importProgress: null });
       } catch (err) {
         logError(`import: ${String(err)}`);
-        set({ importFailed: true });
+        set({ importFailed: true, importProgress: null });
         show('saveFailed');
       }
     },

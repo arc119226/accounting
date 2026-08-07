@@ -158,12 +158,22 @@ export function StatsScreen() {
     [categories],
   );
 
-  const pickedRows = useMemo(() => {
-    if (!pickedCat) return [] as ExpenseRecord[];
-    return rows
+  /**
+   * 分類明細要有上限。區間可以是「今年」⇒ 點最大的分類，**第一年就**是 1,000+ 列、
+   * 每列一個 button 內含 3–4 個 span ≈ 6,000 個 DOM 節點一次插入（點一下圖例卡半秒，
+   * 之後整頁捲動都變頓）。LedgerScreen 檔頭那句「單月 <300 筆不需虛擬化」對主帳頁成立，
+   * 但這條清單不受單月約束——同一個結論被套用到了不同量級的東西上。
+   * 不做虛擬化：上限就夠了，而虛擬化會把捲動位置與大字級的互動全部變複雜。
+   */
+  const PICKED_LIMIT = 100;
+  const picked = useMemo(() => {
+    if (!pickedCat) return { rows: [] as ExpenseRecord[], total: 0 };
+    const all = rows
       .filter((r) => !r.deleted && r.categoryId === pickedCat && r.date >= range.from && r.date <= range.to)
       .sort((a, b) => (a.date === b.date ? (a.id < b.id ? 1 : -1) : a.date < b.date ? 1 : -1));
+    return { rows: all.slice(0, PICKED_LIMIT), total: all.length };
   }, [rows, pickedCat, range]);
+  const pickedRows = picked.rows;
 
   return (
     <div className="screen-body">
@@ -268,6 +278,11 @@ export function StatsScreen() {
                     <span className="entry-amount tnum">{formatNTD(r.amount)}</span>
                   </button>
                 ))}
+                {picked.total > pickedRows.length && (
+                  <p className="dim-text picked-more">
+                    {STATS.pickedMore(picked.total - pickedRows.length)}
+                  </p>
+                )}
               </div>
             )}
           </div>

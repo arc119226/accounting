@@ -125,6 +125,63 @@ describe('reconcileInvoiceDuplicates', () => {
 });
 
 /**
+ * 增量（只看本批碰過的號碼）必須與全掃**等價**。
+ *
+ * 為什麼要增量：同步是一批 500 列、一批一批來的，而舊版每批都重建整本帳的 byNumber
+ * ⇒ 掃描量 n × ⌈n/500⌉。3,000 筆時量不到，30,000 筆時是幾百萬次操作，
+ * 而觸發時機正是「換新手機第一次全量同步」。
+ *
+ * 增量安全的理由：重複只可能由本批動過的列造成——沒被動到的列彼此之間的重複關係，
+ * 上一輪就已經調和過了。這條測試把「上一輪已調和」這個前提做出來再驗等價：
+ * 先全掃一次（模擬前幾批），再對新一批只用 touched 跑增量，結果必須與全掃相同。
+ */
+describe('reconcileInvoiceDuplicates 增量 == 全掃', () => {
+  const ENV2: FreshEnvelope = { updatedAt: '000000000000200-0000-inc', deviceId: 'inc' };
+  const norm = (m: ReadonlyMap<string, ExpenseRecord>): ExpenseRecord[] =>
+    [...m.values()].sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+
+  it('property：已調和的帳本 + 一批新列，增量與全掃結果相同', () => {
+    fc.assert(
+      fc.property(arbRecords, arbRecords, (base, incoming) => {
+        // 前提：base 已經被調和過（前幾批做的事）
+        const settled = reconcileInvoiceDuplicates(base, ENV).next;
+        // 新一批進來：mergeAll 的角色這裡用直接覆蓋模擬，並記下動過的 id
+        const merged = new Map(settled);
+        const touched: string[] = [];
+        for (const [id, row] of incoming) {
+          merged.set(id, row);
+          touched.push(id);
+        }
+        const inc = reconcileInvoiceDuplicates(merged, ENV2, touched);
+        const full = reconcileInvoiceDuplicates(merged, ENV2);
+        expect(norm(inc.next)).toEqual(norm(full.next));
+        expect(inc.deduped).toBe(full.deduped);
+        expect([...inc.changedIds].sort()).toEqual([...full.changedIds].sort());
+      }),
+    );
+  });
+
+  it('changedIds 蓋得住所有被改寫的列（呼叫端靠它決定落盤哪些）', () => {
+    fc.assert(
+      fc.property(arbRecords, (m) => {
+        const r = reconcileInvoiceDuplicates(m, ENV);
+        const actually = [...r.next.entries()].filter(([id, row]) => m.get(id) !== row).map(([id]) => id);
+        expect([...new Set(r.changedIds)].sort()).toEqual(actually.sort());
+      }),
+    );
+  });
+
+  it('帶號墓碑 + 同號活記錄：增量模式也要自癒（釋放 unique index）', () => {
+    const inv = { number: 'AB11111111', randomCode: '1' };
+    const m = toMap([rec({ id: 'tomb', invoice: inv, deleted: true }), rec({ id: 'live', invoice: inv })]);
+    // 只宣告 live 動過——tomb 的號碼會因為 live 帶同號而進 hotNumbers
+    const r = reconcileInvoiceDuplicates(m, ENV, ['live']);
+    expect(r.next.get('tomb')!.invoice).toBeUndefined();
+    expect(r.changedIds).toContain('tomb');
+  });
+});
+
+/**
  * 跨裝置收斂——這個模組存在的理由，之前只被檔頭的一句話擔保著。
  *
  * 上面的 property 只用**單一固定信封**驗冪等與決定論，那等於假設「只有一台裝置

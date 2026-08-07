@@ -77,6 +77,8 @@
   margin-top: 4px;
   padding-top: 4px;
 }
+/* 明細被截斷時的說明（見 StatsScreen 的 PICKED_LIMIT）——截了就要說 */
+.picked-more { padding: 10px 2px; font-size: 13px; text-align: center; }
 
 /* 兩人拔河 */
 .person-split { display: flex; flex-direction: column; gap: 6px; }
