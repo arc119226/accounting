@@ -26,6 +26,8 @@ export const CONFIRM = {
 export const NOTICE = {
   updateReady: '新版本已就緒',
   updateBtn: '重新整理',
+  /** 更新提示是常駐的，沒有關閉鈕它會一直佔著畫面底部 */
+  dismiss: '關閉提示',
   saveFailed: '設定保存失敗——變更僅在本次有效',
   /** 刪除後接金額，配「復原」動作鈕 */
   deletedPrefix: '已刪除 ',
@@ -187,6 +189,10 @@ export const SYNC = {
   exportFailed: '匯出失敗——請再試一次',
   importFailed: '這不是柴米帳的備份檔，或檔案已損毀。',
   backupNag: '已超過 30 天沒有同步或備份——花一分鐘匯出一份吧。',
+  /** 沒拿到持久儲存承諾時的版本：講後果，因為這裡的時限是瀏覽器定的不是我們定的 */
+  backupNagAtRisk: '這個瀏覽器沒有承諾保留帳本，久沒開啟就可能被清掉——現在匯出一份。',
+  /** iOS 分頁模式：講「為什麼要裝」，步驟留在設定頁 */
+  installNag: '在 Safari 分頁裡，帳本可能被系統回收。加到主畫面比較安全 ›',
 } as const;
 
 export const STATS = {
