@@ -3,6 +3,10 @@
  * compact 版給主帳頁（只有總預算一條）。
  */
 import { formatAmount, formatNTD, type BudgetProgress } from '@zhangben/core';
+import { BUDGET } from '../../strings/ui';
+
+/** 超支的符號佐證：顏色以外還要有一個看得見的形狀（低視力／色覺差異都吃這條） */
+const OVER_MARK = BUDGET.overMark;
 
 function BrushBar({ spent, limit }: { spent: number; limit: number }) {
   const over = limit > 0 && spent > limit;
@@ -48,7 +52,10 @@ export function BudgetTotalBrush({
         </span>
       </div>
       <BrushBar spent={spent} limit={limit} />
-      {!compact && over && <p className="over-red budget-over-note">已超支 {formatNTD(spent - limit)}</p>}
+      {/* compact 也要有文字（審查修正）：主帳頁傳的正是 compact，原本超支唯一的訊號
+          是那串數字變紅變粗——放大字級不會讓紅色更好認，而斜線兩邊的數字在大字級下
+          常換行、大小關係更難一眼判讀。月結摘要卡的 movers 早就用 +/− 符號佐證了。 */}
+      {over && <p className="over-red budget-over-note">{OVER_MARK} 已超支 {formatNTD(spent - limit)}</p>}
     </div>
   );
 }
@@ -68,6 +75,7 @@ export function BudgetCategoryList({
           <div className="budget-head">
             <span>{catName(line.categoryId)}</span>
             <span className={`tnum${line.spent > line.limit ? ' over-red' : ''}`}>
+              {line.spent > line.limit ? `${OVER_MARK} ` : ''}
               {formatAmount(line.spent)} / {formatAmount(line.limit)}
             </span>
           </div>

@@ -58,7 +58,9 @@
   border: 1px solid var(--fixed-vf-hint-line);
   border-radius: 999px;
   color: var(--fixed-vf-hint-ink);
-  font-size: 13px;
+  /* em 而非寫死 13px：這是掃描頁**唯一**告訴你現在發生什麼的文字
+     （對準…／已讀到左碼…／這張剛記過了／鏡頭無法開啟），而它原本是全頁最小的字 */
+  font-size: max(13px, 0.9em);
   letter-spacing: 0.08em;
   text-align: center;
 }

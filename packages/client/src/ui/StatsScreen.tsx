@@ -98,9 +98,9 @@ function MonthSummaryCard({ rows, month }: { rows: readonly ExpenseRecord[]; mon
 function MonthStepper({ value, onChange }: { value: string; onChange: (m: string) => void }) {
   return (
     <span className="month-stepper">
-      <button className="ghost-btn stepper-btn" onClick={() => onChange(addMonths(value, -1))}>‹</button>
+      <button className="ghost-btn stepper-btn" aria-label={LEDGER.prevMonth} onClick={() => onChange(addMonths(value, -1))}>‹</button>
       <span className="tnum">{value}</span>
-      <button className="ghost-btn stepper-btn" onClick={() => onChange(addMonths(value, 1))}>›</button>
+      <button className="ghost-btn stepper-btn" aria-label={LEDGER.nextMonth} onClick={() => onChange(addMonths(value, 1))}>›</button>
     </span>
   );
 }

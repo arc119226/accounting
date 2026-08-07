@@ -54,7 +54,14 @@
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
-.seg-btn.active { color: var(--text); border-color: var(--accent); background: var(--seg-active-bg); }
+/* active 不能只靠顏色（審查修正）：放大字級不會讓色差更好認，而分段控制是
+   「現在選的是哪個」的唯一線索。加字重＝形狀差異，去色之後仍然分得出來。 */
+.seg-btn.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--seg-active-bg);
+  font-weight: 700;
+}
 
 button:disabled { opacity: 0.35; cursor: not-allowed; }
 
@@ -178,7 +185,8 @@ button:disabled { opacity: 0.35; cursor: not-allowed; }
 }
 .paper-label:hover,
 .paper-label:focus-visible { box-shadow: var(--shadow-tag-hover); filter: brightness(1.06); }
-.paper-label.active { outline: 2px solid var(--scroll-zhu); outline-offset: 1px; }
+/* 籤條 active：outline 之外再加粗（直書小字的 outline 在大字級下相對變細） */
+.paper-label.active { outline: 2px solid var(--scroll-zhu); outline-offset: 1px; font-weight: 900; }
 /* 籤條刻意窄（15px 直書字＋5px 內距＝27px 寬），但觸控面也只有 27px——記帳最常點的東西。
    透明 ::after 往左右各撐 5px（＝剛好鋪滿 .cat-scroller 的 gap，相鄰命中區恰好接壤不重疊），
    視覺不動、有效寬 27→37px。**沒有到 44**：真要 44 得把籤條加粗一倍、

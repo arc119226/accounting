@@ -179,11 +179,11 @@ export function LedgerScreen() {
             斷行是用 hypothetical size 判定的（**先斷行、後收縮**），橫幅一寬就把「›」
             擠到第二列。合計改由外層的 column 排到第二列，兩顆箭頭永遠與橫幅同列。 */}
         <div className="month-row">
-          <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, -1))}>
+          <button className="ghost-btn month-arrow" aria-label={LEDGER.prevMonth} onClick={() => setMonth(addMonths(monthCursor, -1))}>
             ‹
           </button>
           <div className="scroll-banner month-banner">{formatMonthZh(monthCursor)}</div>
-          <button className="ghost-btn month-arrow" onClick={() => setMonth(addMonths(monthCursor, 1))}>
+          <button className="ghost-btn month-arrow" aria-label={LEDGER.nextMonth} onClick={() => setMonth(addMonths(monthCursor, 1))}>
             ›
           </button>
         </div>

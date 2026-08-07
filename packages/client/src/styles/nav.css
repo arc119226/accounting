@@ -65,6 +65,8 @@
 }
 .nav-btn {
   flex: 1;
+  /* active 的頂部指示條是 ::before 絕對定位，需要這個定位基準 */
+  position: relative;
   /* 下限而非尺寸：字級放大時導覽列要跟著長高，否則圖示與標籤畫到列外。
      toast 的 bottom 公式（toast.css）與這個值是一組的。 */
   min-height: max(56px, 3.5em);
@@ -80,7 +82,19 @@
   transition: color 0.15s;
 }
 .nav-btn:active { background: var(--press-veil); }
-.nav-btn.active { color: var(--accent); }
+/* 導覽 active 原本只換文字顏色。加字重 + 頂部指示條：去色之後
+   「現在在哪一頁」仍然看得出來（低視力與色覺差異都吃這條）。 */
+.nav-btn.active { color: var(--accent); font-weight: 700; }
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 22%;
+  right: 22%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--accent);
+}
 .nav-glyph {
   font-family: var(--font-brush);
   font-size: 22px;

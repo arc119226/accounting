@@ -82,6 +82,7 @@ export function App() {
           <button
             key={it.key}
             className={`nav-btn${screen === it.key ? ' active' : ''}`}
+            aria-current={screen === it.key ? 'page' : undefined}
             onClick={() => setScreen(it.key)}
           >
             <span className="nav-glyph">{it.glyph}</span>

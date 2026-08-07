@@ -53,6 +53,9 @@ export const LEDGER = {
   einvoiceChip: '電',
   weekdays: ['週日', '週一', '週二', '週三', '週四', '週五', '週六'],
   totalPrefix: '合計 ',
+  /** ‹ › 的可及名稱：那兩個字元本身會被念成引號，而這是換月的唯一鍵盤路徑（左右滑是純 pointer） */
+  prevMonth: '上一個月',
+  nextMonth: '下一個月',
 } as const;
 
 export const ENTRY = {
@@ -134,6 +137,8 @@ export const ITEMNOTE = {
 export const RULES = {
   title: '商家規則（掃描學習）',
   empty: '掃發票並歸類後，這裡會記住店家。',
+  /** ✕ 鈕的可及名稱：這顆沒有 ConfirmDialog 把關，誤觸即生效 */
+  deleteRule: '刪除規則',
 } as const;
 
 export const SYNC = {
@@ -233,6 +238,8 @@ export const BUDGET = {
   zeroHint: '填 0 = 不設限',
   save: '儲存預算',
   savedToast: '預算已更新',
+  /** 超支標記：顏色以外的第二個訊號（放大字級不會讓紅色更好認） */
+  overMark: '⚠',
 } as const;
 
 export const NAMECARD = {

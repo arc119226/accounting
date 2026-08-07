@@ -66,7 +66,7 @@
   min-height: max(44px, 2.75em);
 }
 .legend-row:last-child { border-bottom: none; }
-.legend-row.active { background: var(--seg-active-bg); border-radius: 8px; }
+.legend-row.active { background: var(--seg-active-bg); border-radius: 8px; font-weight: 700; }
 .legend-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .legend-count { font-size: 12px; }
 .legend-amount { font-weight: 600; }
