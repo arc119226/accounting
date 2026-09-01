@@ -1,10 +1,20 @@
 /**
  * Trystero（Nostr signaling）同步殼——protocol.ts 純 reducer 的 I/O 執行器。
  *
- * 為什麼選 Nostr strategy：公共 relay 數百個有冗餘、零自架；SDP 以
- * appId+password 派生金鑰自動加密，房間碼即通行密語。同一 Wi-Fi 下兩機
- * 走 host candidate 直連，relay 只經手 ~2KB 的 signaling。
+ * 為什麼選 Nostr strategy：公共 relay 零自架；SDP 以 appId+password 派生金鑰
+ * 自動加密，房間碼即通行密語。同一 Wi-Fi 下兩機走 host candidate 直連，
+ * relay 只經手 ~2KB 的 signaling。
  * STUN 仍帶 Google 公共伺服器讓異網情境（行動網路×Wi-Fi）也能打洞；TURN 不設（無免費）。
+ *
+ * ⚠️ **升級 trystero 之前先讀這段**。relay 不是「公共的數百個一起用」：清單烤在
+ * @trystero-p2p/nostr 裡（0.25.3 是 47 個），而實際只取 **5 個**，選法是
+ * `shuffle(清單, strToNum(APP_ID)).slice(0, 5)`。決定性是必要的——兩機得在同一批
+ * relay 上碰頭才找得到對方——但它也意味著**清單增刪任何一個，洗出來的 5 個就可能
+ * 與舊版毫無交集**（Fisher-Yates 換個長度，同一顆種子的結果整個重排）。
+ * 而 SW 會讓還沒更新的那支手機繼續跑舊 bundle ⇒ **一支更新、一支沒更新，兩邊各自在
+ * 不同的 relay 上等**，畫面只顯示「等不到對方」，完全看不出原因。
+ * 升級後請兩支手機都確認更新完成再同步；要徹底斷開這個耦合，就傳
+ * `relayConfig: { urls: [...] }`（getRelays 的第一個分支即是它），代價是清單自己維護。
  */
 import { joinRoom, type Room } from 'trystero/nostr';
 import { changedSince, type Syncable } from '@zhangben/core';
