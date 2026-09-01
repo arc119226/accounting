@@ -17,6 +17,8 @@ describe('parseSyncLink（兩種 payload 的相容契約）', () => {
     expect(parseSyncLink('#sync=ABC234')).toBe('ABC234');
     expect(parseSyncLink('https://accounting.arc.idv.tw/#sync=ABC234')).toBe('ABC234');
     expect(parseSyncLink('https://accounting.arc.idv.tw/#SYNC=abc234')).toBe('ABC234');
+    // host 完全不參與比對（正則只認 #SYNC=）——分支部署到別的網域一樣解得開
+    expect(parseSyncLink('https://example.com/#sync=ABC234')).toBe('ABC234');
   });
 
   it('buildSyncLink 產出的內容自己解得回來（成對契約）', () => {

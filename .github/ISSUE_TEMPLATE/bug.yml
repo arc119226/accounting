@@ -1,0 +1,61 @@
+name: Bug 回報
+description: 某個東西壞了、或在你的裝置上跟預期不同
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        真機相容性的回報特別有價值——維護者只有兩台裝置，
+        掃碼、iOS/Android 差異、字級放大之後的版面都很難自己驗到。
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 發生了什麼
+      description: 你做了什麼、預期看到什麼、實際看到什麼
+      placeholder: |
+        1. 開掃描頁
+        2. 對準發票左邊的 QR
+        3. 預期：讀到金額；實際：一直停在「對準發票上的兩個 QR」
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: 裝置與瀏覽器
+      placeholder: iPhone 13 / iOS 18.2 / Safari，或 Pixel 7 / Android 15 / Chrome 131
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installed
+    attributes:
+      label: 怎麼開的
+      options:
+        - 瀏覽器分頁
+        - 安裝到主畫面（standalone）
+        - 不確定
+    validations:
+      required: true
+
+  - type: dropdown
+    id: a11y
+    attributes:
+      label: 系統字級
+      description: 低視力＋放大字級是本專案的主要情境，這一欄很重要
+      options:
+        - 預設
+        - 有放大（大約幾成？寫在下面）
+        - 不確定
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 診斷資訊（選填）
+      description: >-
+        設定頁最下方的「複製診斷資訊」。那是純本機的錯誤環形日誌，
+        **不含任何帳目內容**——貼上來之前還是自己看一眼比較安心。
+      render: text

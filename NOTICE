@@ -1,0 +1,45 @@
+柴米帳（zhangben）
+Copyright 2026 Arc Liu
+
+本產品的原始碼以 Apache License 2.0 授權，全文見同目錄的 LICENSE。
+
+--------------------------------------------------------------------------------
+以下項目**不受**上述授權管轄，各自維持原授權
+--------------------------------------------------------------------------------
+
+## 字體：LXGW WenKai TC（霞鶩文楷 正體中文）
+
+    packages/client/public/fonts/zb-brush.woff2
+
+Copyright 2022-2026 The LXGW WenKai Project Authors
+https://github.com/lxgw/LxgwWenkaiTC
+
+以 SIL Open Font License 1.1 授權，全文隨檔案散布於
+`packages/client/public/fonts/OFL-LXGWWenKaiTC.txt`（正式站上為 /fonts/OFL-LXGWWenKaiTC.txt）。
+
+**OFL 第 5 條明訂字體不得改以其他授權散布**，故本 repo 的 Apache-2.0 不及於此檔。
+`zb-brush.woff2` 是原字體的子集化版本；子集化屬於 OFL 定義的「修改版本」，
+因此已更名（family name `ZBBrush`）以避免與原字型名混淆。
+
+## 條碼解析引擎（編譯進 WebAssembly）
+
+正式站散布的 `.wasm` 由 npm 套件 `zxing-wasm` 提供，其中包含：
+
+- **zxing-cpp** — Apache License 2.0
+  https://github.com/zxing-cpp/zxing-cpp
+- **zint** — BSD 3-Clause License
+  https://sourceforge.net/projects/zint/
+- zxing-wasm 自身的封裝程式碼 — MIT License
+  https://github.com/Sec-ant/zxing-wasm
+
+--------------------------------------------------------------------------------
+非第三方，僅為釐清
+--------------------------------------------------------------------------------
+
+原始碼中多處註解寫「移植自 super-reversi2 / sr2」（設計系統、`storage.ts`、
+`errlog.ts`、`notice.ts`、版本識別等）。super-reversi2 是**同一作者的前作**，
+不是第三方程式碼，不涉及額外的授權義務。
+
+--------------------------------------------------------------------------------
+
+文件（`docs/`）不走 Apache-2.0，改以 CC BY-SA 4.0 授權，見 docs/LICENSE.md。

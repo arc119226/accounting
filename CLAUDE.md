@@ -1,7 +1,7 @@
 # 柴米帳（zhangben）— 雙人記帳 PWA
 
-夫妻兩人用的 local-first 記帳 PWA：帳本存瀏覽器 IndexedDB、WebRTC 面對面同步（Trystero/Nostr signaling）、
-掃台灣電子發票雙 QR 自動記帳、手寫 SVG 統計圖、宣紙／夜墨水墨 UI（設計系統移植自 C:\gitcode\super-reversi2）。
+給兩個人共用的 local-first 記帳 PWA：帳本存瀏覽器 IndexedDB、WebRTC 面對面同步（Trystero/Nostr signaling）、
+掃台灣電子發票雙 QR 自動記帳、手寫 SVG 統計圖、宣紙／夜墨水墨 UI（設計系統移植自作者前作 super-reversi2）。
 
 **動工前先讀 `docs/BACKLOG.md`**：前半是設計原則（憲法級的「不做什麼」——不做分帳、不做
 「這個圈 N 天沒更新」這類提醒、永遠不清墓碑），後半是排序過的待辦與已知取捨。
@@ -42,7 +42,7 @@
   `--fixed-*` 那組**不得隨主題變**——QR quiet zone 與取景器的讀者是相機，不是人眼
 - styles.css 是純 @import barrel，**順序即契約**（test/styles.test.ts 鎖順序 + 檢查 CSS url() 資產存在）
 - 每個畫面資產都要有回退（圖 → 漸層 → 純色，一行 background 疊層）
-- **使用者是低視力、系統字級開到最大**——大字是主要情境不是邊緣情境；顏色不可單獨承載資訊
+- **本專案以低視力＋系統字級開到最大為主要情境**——大字不是邊緣情境；顏色不可單獨承載資訊
   （超支、選中態一律另加文字或字重），觸控目標寫成 `max(44px, …)`
 - 註解寫「為什麼」，繁體中文；禁：霓虹色、科技感漸層、glassmorphism、emoji 濫用、簡體字
 
@@ -53,5 +53,5 @@
 
 ## 部署
 
-⚠️ **合併到 `main` = 直接上正式站**：Cloudflare Workers Builds 綁在 `main`，而這對夫妻每天在用它記帳。
-一律開 PR 給使用者自己合，不要代為 push/merge main。手動部署是 `pnpm build && npx wrangler deploy`。
+⚠️ **合併到 `main` = 直接上正式站**：Cloudflare Workers Builds 綁在 `main`，而正式站每天有人在用它記帳。
+一律開 PR 給維護者自己合，不要代為 push/merge main。手動部署是 `pnpm build && npx wrangler deploy`。

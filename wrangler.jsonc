@@ -4,6 +4,9 @@
   // Deploy command=`npx wrangler deploy`——deploy 靠本檔的 name 定位目標 Worker，
   // **name 必須與儀表板建立的 Worker 同名**，否則會部署到另一個同帳號的新 Worker，
   // 綁了網域的那個永遠停在 Hello World 範本（實際踩過）。
+  //
+  // **Fork 請看這裡**：下面的 name 與 routes 是本站專屬的，換手部署一定要改。
+  // 改法與踩雷說明見 README 的「自己部署」。
   "name": "accounting",
   "workers_dev": true,
   // 正式域：deploy 時自動建 DNS+憑證（前提：arc.idv.tw zone 在同一 Cloudflare 帳號，
