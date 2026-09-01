@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 功能建議 / 想加某個功能
+    url: https://github.com/arc119226/accounting/blob/main/docs/BACKLOG.md
+    about: >-
+      本專案原則上不收功能請求。分帳、雲端同步、帳號、「N 天沒更新」提醒、
+      清理墓碑等等不是還沒排到，是已經被明文否決——理由寫在 BACKLOG 的設計原則裡。
+      請先讀那一份。
+  - name: 安全性問題
+    url: https://github.com/arc119226/accounting/security/advisories/new
+    about: 請走私密回報，不要開公開 issue。

@@ -1,0 +1,40 @@
+# lint / typecheck / test / build。**這支 workflow 不部署**——
+# 部署只由 Cloudflare Workers Builds（綁 main）觸發，兩者互不相干。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 同一分支上新的 push 取消還在跑的舊的（PR 連推幾次時不要排隊）
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 必須排在 setup-node 之前：setup-node 的 cache: pnpm 要先找得到 pnpm。
+      # 版本不寫死，由 package.json 的 packageManager 決定（單一真相源）。
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      # --frozen-lockfile：lockfile 與 package.json 對不上就直接失敗，
+      # 而不是安靜地解出一組跟本機不同的相依
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
