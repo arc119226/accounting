@@ -269,4 +269,13 @@ export const SETTINGS = {
   diagCopy: '複製診斷資訊',
   diagCopied: '已複製',
   versionPrefix: '版本 ',
+  relayTitle: '同步用的中繼站',
+  relayBody: '面對面同步時，這些伺服器只幫兩支手機交換一段加密的連線資訊（約 2KB）。帳本本身不經過它們。',
+  relayAnchorTag: '自架',
+  relayNever: '尚未更新過（用的是內建清單）',
+  relayUpdatedPrefix: '清單更新於 ',
+  relayRefresh: '檢查清單更新',
+  relayRefreshing: '檢查中…',
+  relayChanged: '清單已更新',
+  relayUnchanged: '已是最新',
 } as const;

@@ -1,5 +1,5 @@
 /**
- * 設定：我的稱呼 / 每月預算 / 分類管理入口 / 儲存空間狀態 / 診斷 / 版本。
+ * 設定：我的稱呼 / 每月預算 / 分類管理入口 / 同步中繼站 / 儲存空間狀態 / 診斷 / 版本。
  */
 import { useEffect, useState } from 'react';
 import { parseAmountInput, sortCategories } from '@zhangben/core';
@@ -12,6 +12,7 @@ import { show } from '../notice';
 import { applyTheme } from '../theme';
 import type { ThemePref } from '../settings';
 import { BUDGET, NAV, SETTINGS } from '../strings/ui';
+import { ANCHOR, refreshRelays, relayStatus } from '../sync/relays';
 
 function BudgetCard() {
   const budget = useAppStore((s) => s.budget);
@@ -197,6 +198,56 @@ function ThemeCard() {
   );
 }
 
+/**
+ * 同步用的中繼站。
+ *
+ * 為什麼要讓使用者看得到:這台 app 的核心宣稱是「沒有伺服器、帳不離開你的裝置」,
+ * 而 signaling 是這句話唯一的例外 —— 那幾秒鐘確實有第三方看得到你的 IP 與連線時間
+ * (看不到帳)。既然開源的理由是「那句話可以被驗證」,清單就不該只活在原始碼裡。
+ *
+ * 更新是**手動一顆鈕 + 啟動時自動一次**,不跳通知:清單是管線,使用者沒有依據可以
+ * 說不;而且錨點保證兩機必定相遇,清單不一樣也不會出事。
+ */
+function RelayCard() {
+  const [status, setStatus] = useState(() => relayStatus());
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const refresh = (): void => {
+    setBusy(true);
+    setResult(null);
+    void refreshRelays(Date.now()).then((changed) => {
+      setStatus(relayStatus());
+      setBusy(false);
+      setResult(changed ? SETTINGS.relayChanged : SETTINGS.relayUnchanged);
+      setTimeout(() => setResult(null), 3000);
+    });
+  };
+
+  return (
+    <div className="paper-card">
+      <div className="field-label">{SETTINGS.relayTitle}</div>
+      <p className="dim-text">{SETTINGS.relayBody}</p>
+      <ul className="relay-list">
+        {status.urls.map((u) => (
+          <li key={u}>
+            <span className="relay-host">{u.replace(/^wss:\/\//, '')}</span>
+            {u === ANCHOR && <span className="relay-tag">{SETTINGS.relayAnchorTag}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="dim-text">
+        {status.updatedAt === 0
+          ? SETTINGS.relayNever
+          : SETTINGS.relayUpdatedPrefix + new Date(status.updatedAt).toLocaleDateString('zh-Hant')}
+      </p>
+      <button className="ghost-btn" onClick={refresh} disabled={busy}>
+        {busy ? SETTINGS.relayRefreshing : (result ?? SETTINGS.relayRefresh)}
+      </button>
+    </div>
+  );
+}
+
 export function SettingsScreen() {
   const setScreen = useAppStore((s) => s.setScreen);
   const [storage, setStorage] = useState<StorageInfo | null>(null);
@@ -221,6 +272,8 @@ export function SettingsScreen() {
           {NAV.categories} ›
         </button>
       </div>
+
+      <RelayCard />
 
       <div className="paper-card">
         <div className="field-label">{SETTINGS.storageTitle}</div>

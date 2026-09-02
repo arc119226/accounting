@@ -8,6 +8,7 @@ import { initKeyboardInsets } from './keyboard';
 import { show } from './notice';
 import { useAppStore } from './store/appStore';
 import { parseSyncLink } from './sync/deepLink';
+import { refreshRelays } from './sync/relays';
 import { applyTheme, watchSystemTheme } from './theme';
 import './styles.css';
 
@@ -19,6 +20,12 @@ initServiceWorker();
 initUpdateCheck();
 // 軟鍵盤讓位：量 visualViewport 寫 --kb（iOS 專用；Android 靠 viewport meta 自己縮）
 initKeyboardInsets();
+
+// relay 清單:啟動時去同源要一次最新的（跟 version.json 同一個網域，零新增隱私成本）。
+// 背景、靜默、失敗不影響任何事——手上那份（快取或 bundled）一定能用。
+// 換掉了也不通知：清單是管線，使用者沒有依據可以說不；而且錨點保證兩機必定相遇，
+// 兩支手機清單不一樣也不會出事 ⇒ 沒有緊急性。要看就去設定頁。
+void refreshRelays(Date.now());
 // 主題：index.html 的首漆 script 已經把 data-theme 定好（避免閃白），這裡是**接手**——
 // styles.css 已載入，所以現在才讀得到算出來的 --bg 去更新 theme-color。
 applyTheme(useAppStore.getState().settings.theme);
