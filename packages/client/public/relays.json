@@ -1,11 +1,12 @@
 {
   "_comment": "公共 signaling relay 清單。自架的 wss://relay.arc.idv.tw 是錨點，寫在程式裡（sync/relays.ts 的 ANCHOR），不在這裡也不可能被這裡改掉。改這份 JSON 部署上去，兩支手機下次開 app 就會換過來，不必發新版 bundle。.json 不在 SW 的 precache patterns 裡，永遠走網路。",
-  "_migration": "目前這 5 個就是舊版洗出來的那 5 個，為的是讓還沒更新的手機也配得上對。兩支手機都更新完之後可以換成乾淨的清單（例如拿掉 staging.yabu.me）。",
+  "_verified": "2026-09-03 用 tools/probe-relays.mjs 逐台實測過（送得進去且收得回來，不是只有連得上）。要改這份清單之前先跑那支。",
+  "_migration": "前兩台是舊版洗出來的那 5 個裡**還活著**的兩台，留著讓還沒更新的手機也配得上對。另外 3 台（hornetstorage / slick.mjex.me / communities.nos.social）2026-09-03 實測全掛，留著只是浪費連線，已移除。兩支手機都更新完之後，這兩台也可以拿掉。",
   "relays": [
-    "wss://hornetstorage.net/relay",
-    "wss://slick.mjex.me",
     "wss://staging.yabu.me",
     "wss://relay2.angor.io",
-    "wss://communities.nos.social"
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+    "wss://relay.primal.net"
   ]
 }

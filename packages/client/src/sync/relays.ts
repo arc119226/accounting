@@ -33,18 +33,29 @@ export const ANCHOR = 'wss://relay.arc.idv.tw';
 /**
  * 隨 bundle 出貨的公共 relay。拿不到 `relays.json`（離線、部署間隙）時用這串。
  *
- * ⚠️ 這裡刻意就是**舊版洗出來的那 5 個**，包含難看的 `staging.yabu.me`。
- * 理由是**平滑升級**：這一版上線之後，更新過的手機與還沒更新的手機仍然共用這 5 個，
- * 配得上對；更新過的兩支之間則多一個錨點。沒有它，升級當下就會複製出
- * 上面那條 hazard 的症狀（新舊兩機清單毫無交集）。
- * 兩支手機都更新完之後，把 `public/relays.json` 換成乾淨的清單即可 —— **不必發新版**。
+ * 前兩台是**平滑升級的橋**：它們是舊版洗出來的那 5 個裡還活著的兩台，留著讓更新過的
+ * 手機與還沒更新的手機仍然有交集、配得上對。沒有它們，升級當下就會複製出上面那條
+ * hazard 的症狀（新舊兩機清單毫無交集）。兩支手機都更新完之後可以拿掉。
+ *
+ * 舊版那 5 個裡的另外 3 個（`hornetstorage.net/relay`、`slick.mjex.me`、
+ * `communities.nos.social`）**2026-09-03 實測全掛** —— 前兩台 WebSocket 開得起來但每則
+ * 事件都被拒（一台改成允許清單制、一台每則都 internal error），第三台連不上。
+ * 它們橋不到任何東西，只是三條必然失敗的連線，所以移除。
+ * 也就是說柴米帳先前實際上是靠 `staging.yabu.me` 與 `relay2.angor.io` 兩台在配對 ——
+ * 這正是錨點要解決的事：那是唯一一台**壞了我會知道**的。
+ *
+ * ⚠️ 這串跟 `public/relays.json` 目前是同一份，刻意的：讓「離線的全新安裝」與
+ * 「線上的全新安裝」行為一致，少一種只在離線出現的狀態。之後只改 JSON 就好，
+ * 這串不必跟著動（它只在第一次 refresh 成功之前有效）。
+ * 要換清單前先跑 `node tools/probe-relays.mjs` —— 判準是「送得進去且收得回來」，
+ * 不是「連得上」。上面那 3 台就是只驗連線會誤判成健康的例子。
  */
 const BUNDLED_TAIL: readonly string[] = [
-  'wss://hornetstorage.net/relay',
-  'wss://slick.mjex.me',
   'wss://staging.yabu.me',
   'wss://relay2.angor.io',
-  'wss://communities.nos.social',
+  'wss://relay.damus.io',
+  'wss://nos.lol',
+  'wss://relay.primal.net',
 ];
 
 const KEY = 'zb.relays';
